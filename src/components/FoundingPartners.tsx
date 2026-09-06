@@ -4,12 +4,12 @@ const perks = [
   {
     icon: Handshake,
     title: 'Direct line to the builder',
-    body: 'Founding partners get a direct channel to shape the roadmap — request features, get them shipped fast.',
+    body: 'Launch customers get a direct channel to shape what gets built next — request features, get them shipped fast.',
   },
   {
     icon: ShieldCheck,
-    title: 'Rate locked in for life',
-    body: 'Whatever tier you join at, that price never goes up for you — even as later pricing rises.',
+    title: 'One price, no subscription',
+    body: "Pay once and it's set up for good — no monthly bill, no price creeping up on you later.",
   },
   {
     icon: TrendingUp,
@@ -27,12 +27,12 @@ function FoundingPartners() {
             Why join now
           </span>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
-            We're onboarding our first 20 businesses by hand.
+            We're onboarding our first 15 businesses by hand.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-ink-300">
-            Recepta AI is brand new — which means early partners get more
-            attention, more input, and better pricing than anyone who joins
-            later.
+            Recepta AI is brand new — which means launch customers get more
+            personal attention and a lower one-time price than anyone who
+            joins later.
           </p>
         </div>
         <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">

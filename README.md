@@ -142,6 +142,32 @@ from Settings → Developer → API Keys, and find the event type's numeric
 ID (in its URL or via Cal.com's API). Enter both in `/admin.html` for
 that business.
 
+## Selling it
+
+The pricing section (`src/components/Pricing.tsx`) is a single one-time
+price with a "Get Started" button. To make that button take real
+payments:
+
+1. Create a free account at [stripe.com](https://stripe.com) (needs
+   your bank details to actually receive payouts, but the account and
+   payment link work before that's finished).
+2. In the Stripe Dashboard: **Payment links → Create payment link** →
+   add a product (name it something like "Recepta AI Setup") → set it
+   to a **one-time** price, not recurring → the amount you're charging.
+3. Under that link's settings, turn on **"Collect customer information"**
+   for name, email, and phone — this gets you their contact info at the
+   moment they pay, so you don't have to chase it down separately.
+4. Copy the payment link's URL (looks like `https://buy.stripe.com/...`).
+5. In Netlify: **Site configuration → Environment variables** → add
+   `VITE_PAYMENT_LINK_URL` set to that URL → redeploy.
+6. The "Get Started" button now goes straight to checkout. To change the
+   price later, edit it in Stripe (or create a new link) — no code
+   change needed here.
+
+Stripe emails you the moment someone pays, with their contact info
+attached — that's your signal to start onboarding them (see the
+checklist below).
+
 ## Development
 
 ```bash

@@ -25,10 +25,10 @@ function Header() {
           ))}
         </nav>
         <a
-          href="#waitlist"
+          href="#pricing"
           className="rounded-full bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-400"
         >
-          Join founding partners
+          Get Recepta AI
         </a>
       </div>
     </header>

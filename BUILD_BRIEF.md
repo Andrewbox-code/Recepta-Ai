@@ -29,15 +29,28 @@ sell to their own local-business clients.
 
 ## Business model
 
-- **Direct SaaS**: sell subscriptions straight to local businesses
-  (Starter/Growth tiers, see `Pricing.tsx`)
-- **Agency reseller channel**: white-label tier for agencies/consultants
-  who resell to their own client base — this is usually the faster path
-  to volume, since one agency deal can bring 10+ locations at once
-- **Founding-partner motion**: the first ~20 customers get locked-in
-  pricing and hands-on setup in exchange for being early — this builds
-  the first real testimonials and case studies, which are currently
-  missing from the landing page on purpose (no fake reviews)
+**One-time price, not a subscription.** Deliberate choice for a solo
+seller: no billing system to run, no churn to manage, no monthly
+support burden per customer. Currently `$697` launch price for the
+first 15 businesses (regular `$997` after), see `Pricing.tsx`. Sold via
+a Stripe Payment Link (see README's "Selling it" section) — takes
+minutes to set up, no code.
+
+**Important tradeoff to understand:** the AI/SMS/calendar backend for
+every customer runs on this one shared deployment, under your own
+Twilio and Anthropic accounts — customers never see or pay those bills,
+you do. A one-time price has to cover each customer's ongoing usage
+cost for as long as they keep using it, not just the setup labor. Real
+per-customer costs are modest for a small local business (roughly
+$5-15/month: a Twilio number + SMS/call usage, plus Claude API calls),
+but they're recurring and yours, forever, against a payment you only
+get once. Price accordingly, watch actual usage as customers come on,
+and revisit the price (or consider passing costs through per-business
+later) if a customer turns out unusually heavy.
+
+Longer-term, once there's a track record: an agency/white-label
+reseller channel (one agency deal can bring 10+ locations at once) is
+a natural way to grow beyond one-by-one sales.
 
 ## Current state (what's already built)
 
@@ -95,9 +108,14 @@ sell to their own local-business clients.
   shapes are built from Cal.com's documented v2 API but genuinely
   untested live. Test a real booking together the first time a business
   has real Cal.com credentials.
+- **One-time pricing page** (`src/components/Pricing.tsx`) — a single
+  $697 launch price (regular $997), no subscription tiers. Its "Get
+  Started" button reads `VITE_PAYMENT_LINK_URL` from the environment
+  and links straight to Stripe checkout once that's set; until then it
+  falls back to the contact form. See README's "Selling it" section for
+  exact setup steps (a Stripe Payment Link — no code, minutes to make).
 - The lead form posts to Netlify Forms — zero backend, works the moment
   this is deployed on Netlify (see README for deploy steps)
-- Nothing here yet handles billing — that's the roadmap below
 
 ## What's needed from the human to go further
 
@@ -121,9 +139,9 @@ sell to their own local-business clients.
   an event type, an API key, and the event type's numeric ID, entered in
   `/admin.html` — this is the piece that needs a live test together
   before trusting it with a real customer (see "Current state" above)
-- For Phase 8+: a Stripe account for billing — not needed to deploy,
-  collect leads, run real AI web chat/SMS, or run real calendar booking
-  today
+- A Stripe account + a one-time Payment Link, set as `VITE_PAYMENT_LINK_URL`
+  in Netlify — this is Phase 8, and it's simple: no subscriptions, no
+  webhooks, just a checkout link (see README's "Selling it" section)
 
 ## Roadmap, in priority order (revenue first, infrastructure second)
 
@@ -166,8 +184,11 @@ sell to their own local-business clients.
    this sandbox — budget time to test a real booking together and fix
    any field-name mismatches against Cal.com's actual API responses
    before trusting it with a paying customer.
-8. **Stripe billing.** Self-serve checkout for the Starter/Growth tiers;
-   the Agency tier can stay a manual sales conversation.
+8. **Take payment — built, needs a Stripe account.** `Pricing.tsx`'s
+   "Get Started" button already reads `VITE_PAYMENT_LINK_URL`; create a
+   Stripe Payment Link for the one-time price and set that env var to
+   go live — see the README's "Selling it" section. No subscription
+   billing to build; a Payment Link is enough for a one-time sale.
 9. **Case studies.** Once the first founding partners are live, replace
    the honest "no fake testimonials yet" framing in `FoundingPartners.tsx`
    with real quotes and results.
@@ -184,9 +205,12 @@ sell to their own local-business clients.
 > needed per customer), an embeddable widget customers can put on their
 > own site (`public/widget.js`), and Cal.com calendar booking tools
 > wired into the AI (built but not yet verified against a live Cal.com
-> account — see `BUILD_BRIEF.md`'s roadmap item 7). See "What's needed
-> from the human" in `BUILD_BRIEF.md` for the few things still needed to
-> flip each piece on. My priority is revenue: help me either
+> account — see `BUILD_BRIEF.md`'s roadmap item 7). Pricing is a single
+> one-time price (currently $697 launch / $997 regular, no
+> subscription), sold via a Stripe Payment Link — see "Selling it" in
+> README.md. See "What's needed from the human" in `BUILD_BRIEF.md` for
+> the few things still needed to flip each piece on. My priority is
+> revenue: help me either
 > (a) push the roadmap forward — pick the next unbuilt phase in
 > `BUILD_BRIEF.md`'s roadmap and implement it, or (b) improve conversion
 > on the existing landing page (copy, demo realism, pricing framing), or

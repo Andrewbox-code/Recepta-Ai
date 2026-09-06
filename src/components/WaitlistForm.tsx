@@ -66,11 +66,11 @@ function WaitlistForm() {
             Get started
           </span>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
-            Claim your founding-partner spot
+            Ready to get set up?
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-ink-300">
-            Tell us about your business. We'll follow up personally to set up
-            your AI front desk — no obligation.
+            Tell us about your business and we'll follow up personally to get
+            your AI front desk set up — no obligation.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ function WaitlistForm() {
                 type="submit"
                 className="mt-2 rounded-full bg-violet-500 px-8 py-3.5 text-base font-semibold text-white transition hover:bg-violet-400 sm:col-span-2"
               >
-                Claim My Founding Rate
+                Get Started
               </button>
               <p className="text-center text-xs text-ink-300/60 sm:col-span-2">
                 We'll never share your info or spam you.

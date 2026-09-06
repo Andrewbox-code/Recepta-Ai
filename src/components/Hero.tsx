@@ -10,7 +10,7 @@ function Hero() {
       <div className="mx-auto max-w-4xl px-6 text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/10 px-4 py-1.5 text-sm font-medium text-violet-300">
           <Sparkles className="h-4 w-4" strokeWidth={2.25} />
-          Now onboarding founding partners
+          One-time price — no subscription
         </span>
         <h1 className="mt-6 font-display text-4xl font-semibold tracking-tight text-ink-50 md:text-6xl">
           Your business never sleeps.
@@ -31,10 +31,10 @@ function Hero() {
             <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
           </a>
           <a
-            href="#waitlist"
+            href="#pricing"
             className="rounded-full border border-ink-50/15 px-7 py-3.5 text-base font-semibold text-ink-50 transition hover:bg-ink-50/5"
           >
-            Get founding-partner pricing
+            See the one-time price
           </a>
         </div>
         <p className="mt-5 text-sm text-ink-300/70">
