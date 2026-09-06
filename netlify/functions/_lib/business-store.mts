@@ -4,6 +4,15 @@ export type BusinessProfile = {
   name: string
   facts: string
   forwardNumber?: string
+  /** Cal.com API key (from their Cal.com account) and the numeric ID of
+   * the event type to book against. Both must be set for the AI to
+   * check real availability and make real bookings — without them, it
+   * only ever talks about booking, same as before this existed. */
+  calApiKey?: string
+  calEventTypeId?: string
+  /** IANA time zone (e.g. "America/New_York") used for bookings.
+   * Defaults to America/New_York if unset. */
+  calTimezone?: string
 }
 
 /** The persona shown on the landing page's own demo — used whenever no

@@ -13,14 +13,29 @@ function isValidMessage(value: unknown): value is ChatMessage {
   )
 }
 
+// This endpoint is meant to be called from any customer's own website
+// (see public/widget.js), not just this landing page — so it needs to
+// allow cross-origin requests. It's safe to leave wide open: there's no
+// auth, no cookies, and no per-user data involved, exactly like any
+// other public chat-widget backend.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...CORS_HEADERS },
   })
 }
 
 export default async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405)
   }
@@ -46,15 +61,15 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'invalid_messages' }, 400)
   }
 
-  // Lets this same widget eventually be embedded on a real customer's
-  // own site by passing their business key — defaults to the landing
-  // page's own demo persona when none is given.
+  // Lets the same widget be embedded on any customer's own site — the
+  // business key ties this conversation to their profile (added at
+  // /admin.html) instead of the landing page's own demo persona.
   const rawBusinessKey = (body as { business?: unknown })?.business
   const businessKey = typeof rawBusinessKey === 'string' ? rawBusinessKey.slice(0, 200) : undefined
 
   try {
     const business = await getBusiness(businessKey)
-    const reply = await getAiReply(messages, buildSystemPrompt(business))
+    const reply = await getAiReply(messages, buildSystemPrompt(business), business)
     if (!reply) {
       return jsonResponse({ error: 'empty_reply' }, 502)
     }

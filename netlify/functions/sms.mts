@@ -61,7 +61,7 @@ export default async (req: Request): Promise<Response> => {
 
   let reply: string
   try {
-    reply = (await getAiReply(withUserMessage, buildSystemPrompt(business) + SMS_ADDENDUM)) ?? FALLBACK_REPLY
+    reply = (await getAiReply(withUserMessage, buildSystemPrompt(business) + SMS_ADDENDUM, business)) ?? FALLBACK_REPLY
   } catch (error) {
     console.error('SMS AI reply failed:', error)
     reply = FALLBACK_REPLY

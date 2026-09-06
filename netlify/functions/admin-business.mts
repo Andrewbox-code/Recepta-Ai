@@ -18,6 +18,10 @@ function json(body: unknown, status: number): Response {
   })
 }
 
+function isOptionalShortString(value: unknown, maxLength: number): boolean {
+  return value === undefined || value === '' || (typeof value === 'string' && value.length <= maxLength)
+}
+
 function isValidProfile(value: unknown): value is BusinessProfile {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
@@ -28,8 +32,23 @@ function isValidProfile(value: unknown): value is BusinessProfile {
     typeof v.facts === 'string' &&
     v.facts.length > 0 &&
     v.facts.length <= 4000 &&
-    (v.forwardNumber === undefined || (typeof v.forwardNumber === 'string' && v.forwardNumber.length <= 32))
+    isOptionalShortString(v.forwardNumber, 32) &&
+    isOptionalShortString(v.calApiKey, 200) &&
+    isOptionalShortString(v.calEventTypeId, 32) &&
+    isOptionalShortString(v.calTimezone, 64)
   )
+}
+
+/** Drops empty-string optional fields so they're stored as "unset"
+ * rather than as an empty string that would otherwise pass truthy
+ * checks like isCalConfigured(). */
+function cleanProfile(profile: BusinessProfile): BusinessProfile {
+  const cleaned: BusinessProfile = { name: profile.name, facts: profile.facts }
+  if (profile.forwardNumber) cleaned.forwardNumber = profile.forwardNumber
+  if (profile.calApiKey) cleaned.calApiKey = profile.calApiKey
+  if (profile.calEventTypeId) cleaned.calEventTypeId = profile.calEventTypeId
+  if (profile.calTimezone) cleaned.calTimezone = profile.calTimezone
+  return cleaned
 }
 
 /**
@@ -74,7 +93,7 @@ export default async (req: Request): Promise<Response> => {
     if (!isValidProfile(body)) {
       return json({ error: 'invalid_profile' }, 400)
     }
-    await setBusiness(key, body)
+    await setBusiness(key, cleanProfile(body))
     return json({ ok: true }, 200)
   }
 

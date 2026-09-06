@@ -74,11 +74,30 @@ sell to their own local-business clients.
   create/list/lookup/delete all confirmed working, and a call to a
   configured number correctly uses that business's own persona instead
   of the demo's.
+- **An embeddable web chat widget** (`public/widget.js`) — a small,
+  dependency-free `<script>` tag a customer pastes into their own site;
+  it calls `chat.mts` cross-origin (which now sends CORS headers for
+  this) using their business key. Verified with a real cross-origin
+  browser test (two separate local servers simulating "the customer's
+  site" and "this deployment") — loads, opens, sends, and receives
+  correctly with no CORS errors.
+- **Real calendar booking via Cal.com** (`_lib/calcom.mts`,
+  `_lib/anthropic-client.mts`'s tool-use loop) — when a business has a
+  Cal.com API key + event type ID set in `/admin.html`, Claude gets real
+  `check_availability`/`book_appointment` tools and only tells customers
+  about real open slots and real confirmed bookings. Without those two
+  fields set, behavior is unchanged (talks about booking, doesn't create
+  anything) — verified that businesses without Cal.com configured are
+  completely unaffected, and that both Cal.com calls degrade gracefully
+  (return "unavailable," never crash the conversation) when the API is
+  unreachable. **Not verified against a live Cal.com account** — this
+  sandbox has no network access to api.cal.com, so the request/response
+  shapes are built from Cal.com's documented v2 API but genuinely
+  untested live. Test a real booking together the first time a business
+  has real Cal.com credentials.
 - The lead form posts to Netlify Forms — zero backend, works the moment
   this is deployed on Netlify (see README for deploy steps)
-- Nothing here yet handles real calendars or billing, and the web chat
-  widget still only runs on this landing page (not yet embeddable on a
-  customer's own site) — that's the roadmap below
+- Nothing here yet handles billing — that's the roadmap below
 
 ## What's needed from the human to go further
 
@@ -98,9 +117,13 @@ sell to their own local-business clients.
   Twilio number, name, hours/pricing, forwarding number) — this is the
   step that turns "the code supports many businesses" into "this
   specific customer's calls actually work"
-- For Phase 6+: a Stripe account (for billing) and a calendar API
-  (Cal.com or Google Calendar) — neither is needed to deploy, collect
-  leads, run real AI web chat, or run real missed-call text-back today
+- A free Cal.com account per business that wants real calendar booking:
+  an event type, an API key, and the event type's numeric ID, entered in
+  `/admin.html` — this is the piece that needs a live test together
+  before trusting it with a real customer (see "Current state" above)
+- For Phase 8+: a Stripe account for billing — not needed to deploy,
+  collect leads, run real AI web chat/SMS, or run real calendar booking
+  today
 
 ## Roadmap, in priority order (revenue first, infrastructure second)
 
@@ -129,17 +152,20 @@ sell to their own local-business clients.
    Twilio number was called or texted. Onboarding customer #2, #3, etc.
    no longer needs a code change or a redeploy — just a visit to
    `/admin.html` with their info and a Twilio number pointed at the same
-   two webhook URLs. What's still missing: the web chat widget
-   (`chat.mts`) is wired to accept a `business` key already, but nothing
-   embeds it on a real customer's own site yet — right now it only runs
-   on this landing page as the demo.
-6. **Embeddable web widget.** Package `src/components/LiveDemo.tsx`'s
-   chat UI as a small script a customer can drop into their own site
-   (a `<script>` tag pointing at a bundled widget, similar to Intercom/
-   Drift), passing their business key so `chat.mts` answers as them.
-7. **Calendar booking.** Wire confirmed appointments into Cal.com or
-   Google Calendar so bookings land on the business's real calendar
-   without manual entry.
+   two webhook URLs.
+6. **Embeddable web widget — done.** `public/widget.js` is a real,
+   verified `<script>` tag any customer can paste into their own site,
+   passing their business key so `chat.mts` answers as them across
+   origins. Next evolution: right now it always uses the shared
+   Recepta-branded look; a per-business color/greeting override in
+   `/admin.html` would let it match each customer's site better.
+7. **Calendar booking — built, needs a live test.** Claude gets real
+   `check_availability`/`book_appointment` tools the moment a business
+   has Cal.com credentials in `/admin.html`. This is the one piece in
+   the whole repo that couldn't be verified against a live account from
+   this sandbox — budget time to test a real booking together and fix
+   any field-name mismatches against Cal.com's actual API responses
+   before trusting it with a paying customer.
 8. **Stripe billing.** Self-serve checkout for the Starter/Growth tiers;
    the Agency tier can stay a manual sales conversation.
 9. **Case studies.** Once the first founding partners are live, replace
@@ -153,11 +179,14 @@ sell to their own local-business clients.
 > for full context on the product, business model, and roadmap. The
 > landing page is deployed (or ready to deploy) via Netlify, with a real
 > Claude-powered backend for web chat and Twilio-powered missed-call
-> text-back/SMS already built, and real multi-tenancy so one deployment
-> can serve many businesses (added/managed at `/admin.html`, no code
-> changes needed per customer) — see "What's needed from the human" in
-> `BUILD_BRIEF.md` for the few things still needed to flip each piece on.
-> My priority is revenue: help me either
+> text-back/SMS already built, real multi-tenancy so one deployment can
+> serve many businesses (added/managed at `/admin.html`, no code changes
+> needed per customer), an embeddable widget customers can put on their
+> own site (`public/widget.js`), and Cal.com calendar booking tools
+> wired into the AI (built but not yet verified against a live Cal.com
+> account — see `BUILD_BRIEF.md`'s roadmap item 7). See "What's needed
+> from the human" in `BUILD_BRIEF.md` for the few things still needed to
+> flip each piece on. My priority is revenue: help me either
 > (a) push the roadmap forward — pick the next unbuilt phase in
 > `BUILD_BRIEF.md`'s roadmap and implement it, or (b) improve conversion
 > on the existing landing page (copy, demo realism, pricing framing), or

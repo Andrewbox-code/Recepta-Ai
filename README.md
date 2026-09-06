@@ -92,6 +92,56 @@ To turn it on:
 Only steps 1-3 are one-time setup. Onboarding customer #2, #3, etc. is
 just step 4 and 5 again — no redeploy, no code changes.
 
+## Putting the chat widget on a customer's own website
+
+`public/widget.js` is a small, dependency-free embeddable chat bubble.
+Give a customer this snippet to paste into their own site's HTML,
+anywhere:
+
+```html
+<script src="https://YOUR-SITE.netlify.app/widget.js" data-business="+15551234567"></script>
+```
+
+`data-business` must exactly match that business's key in `/admin.html`
+(the same Twilio number). The widget figures out where to send messages
+from its own `src`, so the same snippet works unmodified on any
+customer's site — no other configuration needed. It calls
+`netlify/functions/chat.mts` across origins (that function sends CORS
+headers specifically so this works), so it needs `ANTHROPIC_API_KEY` set
+to give real replies, same as the landing page's own demo widget.
+
+Verified with a real cross-origin browser test (one local server acting
+as "the customer's site," a separate one acting as this deployment) —
+the widget loads, opens, sends, and receives correctly across origins
+with no CORS errors.
+
+## Real calendar booking (Cal.com)
+
+If a business has a Cal.com API key and event type ID set in
+`/admin.html`, the AI gets two real tools — `check_availability` and
+`book_appointment` — and Claude decides when to use them mid-conversation
+(see `netlify/functions/_lib/anthropic-client.mts` and `_lib/calcom.mts`).
+With those set, it checks real open slots instead of inventing them, and
+a confirmed booking is an actual Cal.com booking. Without them, nothing
+changes — it behaves exactly as before (talks about booking, doesn't
+create anything).
+
+**This one honestly needs a live test before you rely on it.** Everything
+else in this repo has been exercised against a real implementation of
+its dependency (Twilio's own SDK, Netlify's own local Blobs server) —
+this sandbox has no network access to `api.cal.com` and no test account,
+so the Cal.com request/response shapes here are built from their
+documented v2 API but unverified live. The first time you set a real
+`calApiKey`/`calEventTypeId` on a business, test an actual booking
+end-to-end and treat any mismatch as expected, not a sign something else
+is broken.
+
+To set it up: create a free account at [cal.com](https://cal.com), set
+up an event type (the kind of appointment being booked), get an API key
+from Settings → Developer → API Keys, and find the event type's numeric
+ID (in its URL or via Cal.com's API). Enter both in `/admin.html` for
+that business.
+
 ## Development
 
 ```bash

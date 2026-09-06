@@ -163,6 +163,20 @@
         <label for="bizForward">Real phone number to ring first (optional)</label>
         <input id="bizForward" type="text" placeholder="+15559876543 (leave blank to text back immediately)" autocomplete="off" />
 
+        <p style="margin: 1.5rem 0 0; padding-top: 1rem; border-top: 1px solid rgba(247, 247, 252, 0.1); font-size: 0.8rem; color: var(--ink-300)">
+          Optional: connect a real Cal.com calendar so bookings are real,
+          not just talked about. Leave all three blank to skip this.
+        </p>
+
+        <label for="bizCalKey">Cal.com API key</label>
+        <input id="bizCalKey" type="password" placeholder="cal_live_..." autocomplete="off" />
+
+        <label for="bizCalEventType">Cal.com event type ID</label>
+        <input id="bizCalEventType" type="text" placeholder="e.g. 123456" autocomplete="off" />
+
+        <label for="bizCalTimezone">Time zone (optional, defaults to America/New_York)</label>
+        <input id="bizCalTimezone" type="text" placeholder="America/Chicago" autocomplete="off" />
+
         <button class="btn-primary" onclick="saveBusiness()">Save business</button>
         <div id="saveStatus" class="status"></div>
       </div>
@@ -195,6 +209,9 @@
         const name = document.getElementById('bizName').value.trim()
         const facts = document.getElementById('bizFacts').value.trim()
         const forwardNumber = document.getElementById('bizForward').value.trim()
+        const calApiKey = document.getElementById('bizCalKey').value.trim()
+        const calEventTypeId = document.getElementById('bizCalEventType').value.trim()
+        const calTimezone = document.getElementById('bizCalTimezone').value.trim()
 
         if (!key || !name || !facts) {
           setStatus(statusEl, 'Phone number, name, and facts are all required.', false)
@@ -203,6 +220,9 @@
 
         const profile = { name, facts }
         if (forwardNumber) profile.forwardNumber = forwardNumber
+        if (calApiKey) profile.calApiKey = calApiKey
+        if (calEventTypeId) profile.calEventTypeId = calEventTypeId
+        if (calTimezone) profile.calTimezone = calTimezone
 
         try {
           const res = await fetch('/.netlify/functions/admin-business?key=' + encodeURIComponent(key), {
@@ -257,12 +277,14 @@
             const row = document.createElement('div')
             row.className = 'biz'
             const safeName = profile.name.replace(/</g, '&lt;')
+            const calStatus = profile.calApiKey && profile.calEventTypeId ? ' · real calendar connected' : ''
             row.innerHTML =
               '<div><h3>' +
               safeName +
               '</h3><p>' +
               key +
               (profile.forwardNumber ? ' · rings ' + profile.forwardNumber + ' first' : ' · texts back immediately') +
+              calStatus +
               '</p></div>'
             const btn = document.createElement('button')
             btn.className = 'btn-danger'
