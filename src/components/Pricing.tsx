@@ -1,123 +1,71 @@
 import { Check } from 'lucide-react'
 
-const tiers = [
-  {
-    name: 'Starter',
-    price: '$297',
-    description: 'One automation, done right — a focused fix for your biggest leak.',
-    features: [
-      'Choose 1 automation module',
-      'Setup & integration included',
-      'Monthly performance summary',
-      'Email support',
-    ],
-    highlighted: false,
-  },
-  {
-    name: 'Growth',
-    price: '$597',
-    description: 'The most popular setup — cover leads, no-shows, and reviews together.',
-    features: [
-      'Choose any 3 automation modules',
-      'Setup & integration included',
-      'Custom scripts for your business',
-      'Priority phone & text support',
-      'Monthly performance review call',
-    ],
-    highlighted: true,
-  },
-  {
-    name: 'Full-Service',
-    price: '$997',
-    description: 'Every module running, fully managed — your entire front desk on autopilot.',
-    features: [
-      'All 4 automation modules',
-      'Custom scripts & ongoing tuning',
-      'Priority phone & text support',
-      'Monthly strategy call',
-      'New automations added as we build them',
-    ],
-    highlighted: false,
-  },
+// Set VITE_PAYMENT_LINK_URL in Netlify's environment variables once
+// you've created a Stripe Payment Link (see README's "Selling it"
+// section) — the button below will link straight to checkout. Until
+// then, it sends people to the contact form instead. Doing this as an
+// env var (not hardcoded here) means changing the link or price later
+// is a Netlify settings change, not a code edit.
+const PAYMENT_LINK_URL = import.meta.env.VITE_PAYMENT_LINK_URL || ''
+
+const LAUNCH_PRICE = '$697'
+const REGULAR_PRICE = '$997'
+const LAUNCH_SPOTS = 15
+
+const features = [
+  'A working AI chat widget installed on their website',
+  'Missed-call text-back and SMS, set up on their own number',
+  'Personally configured with their real hours, pricing, and services',
+  'Real calendar booking if they use (or set up) Cal.com',
+  'No subscription, no recurring bill from us — ever',
 ]
 
 function Pricing() {
+  const ctaHref = PAYMENT_LINK_URL || '#waitlist'
+
   return (
-    <section id="pricing" className="bg-cream-100 py-20 md:py-28">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="text-sm font-semibold uppercase tracking-wide text-gold-700">
-            Pricing
+    <section id="pricing" className="py-20 md:py-28">
+      <div className="mx-auto max-w-2xl px-6">
+        <div className="text-center">
+          <span className="text-sm font-semibold uppercase tracking-wide text-mint-400">
+            Simple, one-time pricing
           </span>
-          <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-fairway-950 md:text-4xl">
-            Less than one part-time front desk hire.
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
+            Pay once. It's theirs for good.
           </h2>
-          <p className="mt-4 text-lg text-fairway-800/80">
-            Flat monthly retainers. No setup surprises, no long-term
-            contracts, cancel any time.
+          <p className="mx-auto mt-4 max-w-xl text-lg text-ink-300">
+            No monthly plan to manage, no surprise bill next month. One price
+            for a fully set-up AI front desk.
           </p>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className={`flex flex-col rounded-3xl border p-8 ${
-                tier.highlighted
-                  ? 'border-fairway-900 bg-fairway-950 text-cream-50 shadow-xl lg:-translate-y-3'
-                  : 'border-fairway-900/10 bg-cream-50 text-fairway-950'
-              }`}
-            >
-              {tier.highlighted && (
-                <span className="mb-4 inline-flex w-fit items-center rounded-full bg-gold-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-fairway-950">
-                  Most Popular
-                </span>
-              )}
-              <h3 className="font-serif text-2xl font-semibold">{tier.name}</h3>
-              <p
-                className={`mt-2 text-sm leading-relaxed ${
-                  tier.highlighted ? 'text-cream-100/75' : 'text-fairway-800/70'
-                }`}
-              >
-                {tier.description}
-              </p>
-              <div className="mt-6 flex items-baseline gap-1.5">
-                <span className="font-serif text-4xl font-semibold">{tier.price}</span>
-                <span
-                  className={`text-sm ${
-                    tier.highlighted ? 'text-cream-100/70' : 'text-fairway-800/60'
-                  }`}
-                >
-                  / month
-                </span>
-              </div>
-              <ul className="mt-8 flex-1 space-y-3">
-                {tier.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5 text-sm">
-                    <Check
-                      className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        tier.highlighted ? 'text-gold-300' : 'text-fairway-600'
-                      }`}
-                      strokeWidth={2.5}
-                    />
-                    <span className={tier.highlighted ? 'text-cream-100/90' : 'text-fairway-800/85'}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <a
-                href="#audit"
-                className={`mt-8 rounded-full px-6 py-3 text-center text-sm font-semibold transition ${
-                  tier.highlighted
-                    ? 'bg-gold-400 text-fairway-950 hover:bg-gold-300'
-                    : 'bg-fairway-900 text-cream-50 hover:bg-fairway-800'
-                }`}
-              >
-                Get Started
-              </a>
-            </div>
-          ))}
+        <div className="mt-12 rounded-3xl border border-violet-400/40 bg-violet-500/10 p-8 shadow-xl shadow-violet-950/40 md:p-10">
+          <span className="w-fit rounded-full bg-violet-500 px-3 py-1 text-xs font-semibold text-white">
+            Launch price — first {LAUNCH_SPOTS} businesses
+          </span>
+          <p className="mt-6 flex items-baseline gap-2">
+            <span className="font-display text-5xl font-semibold">{LAUNCH_PRICE}</span>
+            <span className="text-lg text-ink-300 line-through">{REGULAR_PRICE}</span>
+            <span className="text-ink-300">one-time</span>
+          </p>
+          <ul className="mt-8 flex flex-col gap-3">
+            {features.map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5 text-sm text-ink-100">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-mint-400" strokeWidth={2.5} />
+                {feature}
+              </li>
+            ))}
+          </ul>
+          <a
+            href={ctaHref}
+            className="mt-8 block rounded-full bg-violet-500 px-6 py-3.5 text-center text-base font-semibold text-white transition hover:bg-violet-400"
+          >
+            Get Started — {LAUNCH_PRICE} one-time
+          </a>
+          <p className="mt-4 text-center text-xs text-ink-300/70">
+            One payment, full setup. No subscription, no surprise bill next
+            month — ever.
+          </p>
         </div>
       </div>
     </section>

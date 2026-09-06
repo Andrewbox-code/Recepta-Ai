@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Recepta AI — Business Manager</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --navy-950: #05060f;
+        --navy-850: #0e1226;
+        --navy-800: #131834;
+        --ink-50: #f7f7fc;
+        --ink-300: #b3b6d6;
+        --violet-500: #7c6cff;
+        --violet-400: #9b8dff;
+        --mint-400: #2dd4bf;
+        --danger: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--navy-950);
+        color: var(--ink-50);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        padding: 2rem 1.25rem 4rem;
+      }
+      .wrap {
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: var(--ink-300);
+        margin: 0 0 2rem;
+        font-size: 0.9rem;
+      }
+      .card {
+        background: var(--navy-850);
+        border: 1px solid rgba(247, 247, 252, 0.1);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--ink-300);
+        margin: 1rem 0 0.35rem;
+      }
+      label:first-of-type {
+        margin-top: 0;
+      }
+      input,
+      textarea {
+        width: 100%;
+        background: var(--navy-950);
+        border: 1px solid rgba(247, 247, 252, 0.15);
+        border-radius: 0.6rem;
+        padding: 0.65rem 0.8rem;
+        color: var(--ink-50);
+        font: inherit;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--violet-400);
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: none;
+        border-radius: 999px;
+        padding: 0.7rem 1.4rem;
+        font-weight: 600;
+      }
+      .btn-primary {
+        background: var(--violet-500);
+        color: white;
+        margin-top: 1.25rem;
+      }
+      .btn-primary:hover {
+        background: var(--violet-400);
+      }
+      .btn-danger {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        padding: 0.4rem 0.9rem;
+        font-size: 0.8rem;
+      }
+      .status {
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+        min-height: 1.2em;
+      }
+      .status.ok {
+        color: var(--mint-400);
+      }
+      .status.err {
+        color: var(--danger);
+      }
+      .biz {
+        border: 1px solid rgba(247, 247, 252, 0.1);
+        border-radius: 0.75rem;
+        padding: 1rem 1.1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      .biz h3 {
+        margin: 0 0 0.2rem;
+        font-size: 1rem;
+      }
+      .biz p {
+        margin: 0;
+        color: var(--ink-300);
+        font-size: 0.85rem;
+      }
+      .empty {
+        color: var(--ink-300);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Recepta AI — Business Manager</h1>
+      <p class="sub">
+        Add a customer's business here and their Twilio number will start
+        answering as them instead of the demo. Not customer-facing —
+        keep this link and your admin key to yourself.
+      </p>
+
+      <div class="card">
+        <label for="adminKey">Admin key</label>
+        <input id="adminKey" type="password" placeholder="Paste your ADMIN_KEY here" autocomplete="off" />
+
+        <label for="bizKey">Twilio phone number (this is who "owns" this business)</label>
+        <input id="bizKey" type="text" placeholder="+15551234567" autocomplete="off" />
+
+        <label for="bizName">Business name</label>
+        <input id="bizName" type="text" placeholder="Ridgeline Family Dental" autocomplete="off" />
+
+        <label for="bizFacts">Hours, pricing, services, policies — plain English</label>
+        <textarea
+          id="bizFacts"
+          placeholder="- Open Mon-Fri 9am-5pm, closed weekends.&#10;- Haircuts start at $35, color starts at $90.&#10;- We can usually fit same-day appointments before 2pm."
+        ></textarea>
+
+        <label for="bizForward">Real phone number to ring first (optional)</label>
+        <input id="bizForward" type="text" placeholder="+15559876543 (leave blank to text back immediately)" autocomplete="off" />
+
+        <p style="margin: 1.5rem 0 0; padding-top: 1rem; border-top: 1px solid rgba(247, 247, 252, 0.1); font-size: 0.8rem; color: var(--ink-300)">
+          Optional: connect a real Cal.com calendar so bookings are real,
+          not just talked about. Leave all three blank to skip this.
+        </p>
+
+        <label for="bizCalKey">Cal.com API key</label>
+        <input id="bizCalKey" type="password" placeholder="cal_live_..." autocomplete="off" />
+
+        <label for="bizCalEventType">Cal.com event type ID</label>
+        <input id="bizCalEventType" type="text" placeholder="e.g. 123456" autocomplete="off" />
+
+        <label for="bizCalTimezone">Time zone (optional, defaults to America/New_York)</label>
+        <input id="bizCalTimezone" type="text" placeholder="America/Chicago" autocomplete="off" />
+
+        <button class="btn-primary" onclick="saveBusiness()">Save business</button>
+        <div id="saveStatus" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top: 0; font-size: 1.1rem">Businesses configured</h2>
+        <div id="list" class="empty">Enter your admin key above to load the list.</div>
+      </div>
+    </div>
+
+    <script>
+      const keyInput = document.getElementById('adminKey')
+      const savedKey = localStorage.getItem('recepta-admin-key')
+      if (savedKey) keyInput.value = savedKey
+
+      function headers() {
+        const key = keyInput.value.trim()
+        localStorage.setItem('recepta-admin-key', key)
+        return { 'X-Admin-Key': key, 'Content-Type': 'application/json' }
+      }
+
+      function setStatus(el, message, ok) {
+        el.textContent = message
+        el.className = 'status ' + (ok ? 'ok' : 'err')
+      }
+
+      async function saveBusiness() {
+        const statusEl = document.getElementById('saveStatus')
+        const key = document.getElementById('bizKey').value.trim()
+        const name = document.getElementById('bizName').value.trim()
+        const facts = document.getElementById('bizFacts').value.trim()
+        const forwardNumber = document.getElementById('bizForward').value.trim()
+        const calApiKey = document.getElementById('bizCalKey').value.trim()
+        const calEventTypeId = document.getElementById('bizCalEventType').value.trim()
+        const calTimezone = document.getElementById('bizCalTimezone').value.trim()
+
+        if (!key || !name || !facts) {
+          setStatus(statusEl, 'Phone number, name, and facts are all required.', false)
+          return
+        }
+
+        const profile = { name, facts }
+        if (forwardNumber) profile.forwardNumber = forwardNumber
+        if (calApiKey) profile.calApiKey = calApiKey
+        if (calEventTypeId) profile.calEventTypeId = calEventTypeId
+        if (calTimezone) profile.calTimezone = calTimezone
+
+        try {
+          const res = await fetch('/.netlify/functions/admin-business?key=' + encodeURIComponent(key), {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify(profile),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.error || 'Save failed (' + res.status + ')')
+          }
+          setStatus(statusEl, 'Saved! ' + name + ' will now answer calls/texts to ' + key + '.', true)
+          loadBusinesses()
+        } catch (err) {
+          setStatus(statusEl, err.message, false)
+        }
+      }
+
+      async function deleteBusiness(key) {
+        if (!confirm('Remove ' + key + '? This business will fall back to the demo persona.')) return
+        try {
+          const res = await fetch('/.netlify/functions/admin-business?key=' + encodeURIComponent(key), {
+            method: 'DELETE',
+            headers: headers(),
+          })
+          if (!res.ok) throw new Error('Delete failed (' + res.status + ')')
+          loadBusinesses()
+        } catch (err) {
+          alert(err.message)
+        }
+      }
+
+      async function loadBusinesses() {
+        const listEl = document.getElementById('list')
+        if (!keyInput.value.trim()) {
+          listEl.className = 'empty'
+          listEl.textContent = 'Enter your admin key above to load the list.'
+          return
+        }
+        try {
+          const res = await fetch('/.netlify/functions/admin-business', { headers: headers() })
+          if (!res.ok) throw new Error('Could not load businesses (' + res.status + '). Check your admin key.')
+          const data = await res.json()
+          listEl.className = ''
+          if (!data.businesses || data.businesses.length === 0) {
+            listEl.className = 'empty'
+            listEl.textContent = 'No businesses configured yet — everything answers as the demo.'
+            return
+          }
+          listEl.innerHTML = ''
+          for (const { key, profile } of data.businesses) {
+            const row = document.createElement('div')
+            row.className = 'biz'
+            const safeName = profile.name.replace(/</g, '&lt;')
+            const calStatus = profile.calApiKey && profile.calEventTypeId ? ' · real calendar connected' : ''
+            row.innerHTML =
+              '<div><h3>' +
+              safeName +
+              '</h3><p>' +
+              key +
+              (profile.forwardNumber ? ' · rings ' + profile.forwardNumber + ' first' : ' · texts back immediately') +
+              calStatus +
+              '</p></div>'
+            const btn = document.createElement('button')
+            btn.className = 'btn-danger'
+            btn.textContent = 'Remove'
+            btn.onclick = () => deleteBusiness(key)
+            row.appendChild(btn)
+            listEl.appendChild(row)
+          }
+        } catch (err) {
+          listEl.className = 'empty'
+          listEl.textContent = err.message
+        }
+      }
+
+      keyInput.addEventListener('change', loadBusinesses)
+      if (savedKey) loadBusinesses()
+    </script>
+  </body>
+</html>
