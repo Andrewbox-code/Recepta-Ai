@@ -10,9 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@netlify/blobs": "^11.0.3",
     "lucide-react": "^1.40.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "twilio": "^6.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

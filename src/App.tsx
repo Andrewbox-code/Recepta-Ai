@@ -1,25 +1,27 @@
-import AuditForm from './components/AuditForm'
-import Automations from './components/Automations'
+import FoundingPartners from './components/FoundingPartners'
 import Footer from './components/Footer'
 import Header from './components/Header'
 import Hero from './components/Hero'
+import HowItWorks from './components/HowItWorks'
+import Industries from './components/Industries'
+import LiveDemo from './components/LiveDemo'
 import Pricing from './components/Pricing'
 import Problem from './components/Problem'
-import Roi from './components/Roi'
-import Testimonials from './components/Testimonials'
+import WaitlistForm from './components/WaitlistForm'
 
 function App() {
   return (
-    <div className="min-h-screen bg-cream-50 font-sans text-fairway-950">
+    <div className="min-h-screen bg-navy-950 font-sans text-ink-50">
       <Header />
       <main>
         <Hero />
         <Problem />
-        <Automations />
-        <Roi />
+        <LiveDemo />
+        <HowItWorks />
+        <Industries />
         <Pricing />
-        <Testimonials />
-        <AuditForm />
+        <FoundingPartners />
+        <WaitlistForm />
       </main>
       <Footer />
     </div>

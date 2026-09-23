@@ -1,25 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  --color-fairway-950: #0d2b1f;
-  --color-fairway-900: #123a2a;
-  --color-fairway-800: #17462f;
-  --color-fairway-700: #1f5738;
-  --color-fairway-600: #2a6b45;
-  --color-fairway-500: #3a8058;
+  --color-navy-950: #05060f;
+  --color-navy-900: #0a0d1c;
+  --color-navy-850: #0e1226;
+  --color-navy-800: #131834;
+  --color-navy-700: #1b2145;
+  --color-navy-600: #262e5c;
 
-  --color-cream-50: #fdfbf5;
-  --color-cream-100: #faf6ea;
-  --color-cream-200: #f3ecd8;
+  --color-ink-50: #f7f7fc;
+  --color-ink-100: #e8e9f5;
+  --color-ink-300: #b3b6d6;
 
-  --color-gold-700: #7a5c26;
-  --color-gold-500: #b8923f;
-  --color-gold-400: #cba658;
-  --color-gold-300: #ddc385;
+  --color-violet-600: #6a52ea;
+  --color-violet-500: #7c6cff;
+  --color-violet-400: #9b8dff;
+  --color-violet-300: #c2b8ff;
+
+  --color-mint-500: #22c9b3;
+  --color-mint-400: #2dd4bf;
+  --color-mint-300: #5eead4;
 }
 
 html {
@@ -27,6 +31,6 @@ html {
 }
 
 body {
-  background-color: var(--color-cream-50);
-  color: var(--color-fairway-950);
+  background-color: var(--color-navy-950);
+  color: var(--color-ink-50);
 }
