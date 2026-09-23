@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0f1a12" />
+    <title>Pure Strike — Range</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+
+    <div id="hud">
+      <div class="panel top-left">
+        <div class="brand">PURE STRIKE <span>range prototype</span></div>
+        <div class="row" id="clubs"></div>
+        <div class="row" id="lies"></div>
+      </div>
+
+      <div class="panel top-right">
+        <div id="wind">
+          <svg viewBox="-50 -50 100 100" class="compass">
+            <circle r="44" class="ring" />
+            <path d="M0 -38 L0 -46" class="tick" />
+            <g id="windArrow"><path d="M0 30 L0 -26 M-11 -12 L0 -28 L11 -12" /></g>
+          </svg>
+          <div>
+            <div class="big" id="windSpeed">0 mph</div>
+            <div class="small" id="windDesc">calm</div>
+          </div>
+        </div>
+        <div class="aim">
+          <button data-aim="-1" aria-label="Aim left">◀</button>
+          <span id="aimText">Aim 0°</span>
+          <button data-aim="1" aria-label="Aim right">▶</button>
+        </div>
+        <button id="settingsBtn" class="ghost">Settings</button>
+      </div>
+
+      <div class="panel bottom-left" id="data">
+        <div class="datagrid">
+          <div><label>Carry</label><b id="dCarry">—</b></div>
+          <div><label>Total</label><b id="dTotal">—</b></div>
+          <div><label>Offline</label><b id="dOffline">—</b></div>
+          <div><label>Apex</label><b id="dApex">—</b></div>
+          <div><label>Club spd</label><b id="dClub">—</b></div>
+          <div><label>Ball spd</label><b id="dBall">—</b></div>
+          <div><label>Launch</label><b id="dLaunch">—</b></div>
+          <div><label>Spin</label><b id="dSpin">—</b></div>
+        </div>
+      </div>
+
+      <div class="panel bottom-right" id="session">
+        <div class="title">Session</div>
+        <ol id="shots"></ol>
+      </div>
+
+      <div class="panel lab hidden" id="lab">
+        <div class="title">Swing Lab</div>
+        <div id="labBody" class="labgrid"></div>
+      </div>
+
+      <div class="panel settings hidden" id="settings">
+        <div class="title">Settings <button class="ghost x" id="settingsClose">✕</button></div>
+        <label class="field">Swing speed calibration <span id="refVal"></span>
+          <input type="range" id="speedRef" min="3" max="18" step="0.25" />
+          <small>Your natural full swing should read ~95% swing speed. Lower = easier to reach full power.</small>
+        </label>
+        <label class="field">Turf firmness <span id="firmVal"></span>
+          <input type="range" id="firmness" min="0" max="1" step="0.05" />
+        </label>
+        <div class="field">Wind
+          <div class="row" id="windBtns">
+            <button data-wind="0">Calm</button><button data-wind="1">Light</button><button data-wind="2">Breezy</button><button data-wind="3">Strong</button>
+          </div>
+        </div>
+        <div class="field">Camera
+          <div class="row"><button data-cam="chase">Ball chase</button><button data-cam="tracer">Down the line</button></div>
+        </div>
+        <div class="row">
+          <button id="labBtn">Swing Lab</button>
+          <button id="muteBtn">Sound on</button>
+          <button id="clearBtn">Clear markers</button>
+        </div>
+        <div class="keys">Keys: 1–7 club · Q/E aim · L lab · V camera · W new wind · M mute · Space skip</div>
+      </div>
+
+      <div id="hint">Press &amp; hold anywhere, <b>pull down</b> to take it back, then <b>push up through the ball</b>.<br /><small>Smooth tempo beats raw speed. Swing through — don't stop at the ball.</small></div>
+      <div id="toast"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -59,3 +59,7 @@ A snapshot of this page is also published at
 sharing the look and feel quickly. That link is a static preview only —
 its form does not deliver anywhere — so use a real Netlify (or other)
 deployment for anything you plan to send prospects to for lead capture.
+
+## Golf game prototype
+
+`golf/` is a separate, self-contained project: a browser 3D golf game prototype that uses a gesture-based swing. See [`golf/README.md`](golf/README.md).
