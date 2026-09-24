@@ -183,117 +183,288 @@ function loftShear(geo: THREE.BufferGeometry, loftDeg: number) {
   return geo
 }
 
-// ---------- woods, fairways, hybrids ----------
-function woodHead(c: Club, line: ClubLine, m: M) {
-  const g = new THREE.Group()
-  const dims =
-    c.id === 'dr'
-      ? { w: line.head === 'max' ? 0.122 : line.head === 'tour' ? 0.11 : 0.116, d: line.head === 'max' ? 0.118 : line.head === 'tour' ? 0.1 : 0.108, h: 0.062 }
-      : c.id === '3h'
-        ? { w: 0.094, d: 0.058, h: 0.04 }
-        : c.id === '3w'
-          ? { w: 0.1, d: 0.086, h: 0.039 }
-          : { w: 0.093, d: 0.08, h: 0.036 }
-  const loft = c.loft
-  // Cut well into the ellipsoid so the face is broad and flat, as on a real head.
-  const faceZ = (y: number) => -dims.d * 0.3 + (y - dims.h * 0.5) * Math.tan(THREE.MathUtils.degToRad(loft))
-  const shape = (upper: boolean) => {
-    const geo = new THREE.SphereGeometry(0.5, 64, 24, 0, Math.PI * 2, upper ? 0 : Math.PI / 2, Math.PI / 2)
-    const p = geo.attributes.position
-    for (let i = 0; i < p.count; i++) {
-      let x = p.getX(i)
-      const y = p.getY(i)
-      let z = p.getZ(i)
-      if (!upper) {
-        // Broad, nearly flat sole: keep the planform almost all the way down.
-        const hl = Math.hypot(x, z)
-        if (hl > 1e-6) {
-          const k = (0.5 * (0.82 + 0.18 * (hl / 0.5))) / hl
-          x *= k
-          z *= k
+// ---------- extra textures for the heads ----------
+
+// Iron face in shape units: u = x / length, v = y / toe height.
+function ironFaceTex(spin: boolean) {
+  return tex(`ironface-${spin}`, 512, 320, (g) => {
+    g.fillStyle = spin ? '#8b8984' : '#c9cfd4'
+    g.fillRect(0, 0, 512, 320)
+    // Blast-finished hitting area.
+    g.fillStyle = spin ? 'rgba(60,58,54,0.25)' : 'rgba(150,158,166,0.35)'
+    g.fillRect(70, 60, 360, 220)
+    // Fine vertical milling.
+    g.strokeStyle = 'rgba(255,255,255,0.07)'
+    for (let x = 70; x < 430; x += 3) {
+      g.beginPath()
+      g.moveTo(x, 60)
+      g.lineTo(x, 280)
+      g.stroke()
+    }
+    // Grooves: v runs bottom (0) to top (1); canvas y is flipped.
+    g.fillStyle = spin ? 'rgba(18,18,18,0.95)' : 'rgba(40,44,50,0.85)'
+    for (let i = 0; i < 12; i++) g.fillRect(84, 280 - 16 - i * 17, 332 - i * 4, spin ? 5 : 4)
+  })
+}
+
+// Driver/wood face: u along the face, v up the face.
+function woodFaceTex(style: string) {
+  return tex(`woodface-${style}`, 512, 256, (g) => {
+    if (style === 'speed') {
+      // Red carbon face.
+      for (let y = 0; y < 256; y += 16) {
+        for (let x = 0; x < 512; x += 16) {
+          const odd = (x / 16 + y / 16) % 2
+          g.fillStyle = odd ? '#8e1a1c' : '#6f1214'
+          g.fillRect(x, y, 16, 16)
         }
       }
-      // Pear/triangular planform: wider toward the back and toe.
-      const toe = x + 0.5
-      let X = x * dims.w
-      let Z = z * dims.d * (0.82 + 0.18 * toe)
-      // Sole sits on the ground; the crown domes up to the full head height.
-      let Y = upper ? dims.h * 0.42 + y * 2 * dims.h * 0.58 : dims.h * 0.42 * (1 + 2 * y)
-      Y = Math.max(0.0015, Y)
-      // A flat, lofted face.
-      const fz = faceZ(Y)
-      if (Z < fz) Z = fz
-      // Crown sits a touch lower at the back (aero drop).
-      if (upper) Y -= Math.max(0, Z) * 0.18
-      X += dims.w * 0.52
-      p.setXYZ(i, X, Y, Z)
+    } else {
+      g.fillStyle = style === 'tour' ? '#3a3f45' : '#2a2e33'
+      g.fillRect(0, 0, 512, 256)
+    }
+    g.fillStyle = 'rgba(255,255,255,0.08)'
+    g.fillRect(0, 0, 512, 256)
+    // Scorelines, clear of heel and toe, plus a centre sweet-spot mark.
+    g.fillStyle = 'rgba(220,226,232,0.55)'
+    for (let i = 0; i < 7; i++) g.fillRect(150, 60 + i * 20, 212, 3)
+  })
+}
+
+// Sole graphics: model name and a panel in the accent colour.
+function soleTex(line: ClubLine) {
+  return tex(`sole-${line.id}`, 512, 512, (g) => {
+    const gr = g.createLinearGradient(0, 0, 512, 512)
+    gr.addColorStop(0, '#9aa1a8')
+    gr.addColorStop(1, '#6b737b')
+    g.fillStyle = gr
+    g.fillRect(0, 0, 512, 512)
+    g.fillStyle = '#20252b'
+    g.beginPath()
+    g.moveTo(90, 330)
+    g.quadraticCurveTo(256, 250, 430, 330)
+    g.lineTo(420, 420)
+    g.quadraticCurveTo(256, 360, 100, 420)
+    g.fill()
+    g.fillStyle = hex(line.accent)
+    g.fillRect(120, 300, 280, 8)
+    g.fillStyle = '#ffffff'
+    g.font = 'italic 800 54px "Barlow Condensed", sans-serif'
+    g.textAlign = 'center'
+    g.fillText(line.brand.toUpperCase(), 256, 400)
+  })
+}
+
+// ---------- woods, fairways, hybrids ----------
+// Built from a top-view outline: crown and sole are lofted rings shrinking
+// toward an apex, meeting in a rounded rim, except along the front where
+// they part to leave a tall, flat, lofted face.
+function woodHead(c: Club, line: ClubLine, m: M) {
+  const g = new THREE.Group()
+  const style = line.head
+  const dims =
+    c.id === 'dr'
+      ? { w: style === 'max' ? 0.122 : style === 'tour' ? 0.112 : 0.118, d: style === 'max' ? 0.118 : style === 'tour' ? 0.104 : 0.11, h: 0.064, faceH: 0.057 }
+      : c.id === '3h'
+        ? { w: 0.094, d: 0.055, h: 0.043, faceH: 0.036 }
+        : c.id === '3w'
+          ? { w: 0.104, d: 0.08, h: 0.04, faceH: 0.035 }
+          : { w: 0.096, d: 0.074, h: 0.037, faceH: 0.032 }
+  const { w, d, h, faceH } = dims
+  const faceBottom = 0.004
+  const faceTop = faceBottom + faceH
+  const mid = h * 0.42
+
+  // Pear planform (x = heel -> toe, z = face -> back).
+  const outline = new THREE.CatmullRomCurve3(
+    [
+      [0.07, 0.012],
+      [0.3, -0.004],
+      [0.55, -0.008],
+      [0.8, -0.002],
+      [0.95, 0.03],
+      [1.0, 0.2],
+      [0.97, 0.45],
+      [0.86, 0.72],
+      [0.64, 0.95],
+      [0.4, 1.0],
+      [0.2, 0.86],
+      [0.07, 0.6],
+      [0.01, 0.3],
+      [0.02, 0.1],
+    ].map(([x, z]) => new THREE.Vector3(x * w, 0, z * d)),
+    true,
+    'centripetal',
+  )
+  const U = 96
+  const V = 16
+  const ring = outline.getSpacedPoints(U).slice(0, U)
+  const apex = new THREE.Vector3(0.52 * w, 0, 0.42 * d)
+  const sst = (a: number, b: number, x: number) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+  }
+  // How much each outline point belongs to the face.
+  const faceness = ring.map((p) => sst(0.06 * d, 0.01 * d, p.z) * sst(0.04 * w, 0.12 * w, p.x) * sst(0.04 * w, 0.12 * w, w - p.x))
+
+  const build = (upper: boolean) => {
+    const pos: number[] = []
+    const uv: number[] = []
+    const col: number[] = []
+    for (let v = 0; v <= V; v++) {
+      const t = v / V
+      const dome = Math.pow(Math.sin((t * Math.PI) / 2), upper ? 0.6 : 0.3)
+      for (let u = 0; u < U; u++) {
+        const e = ring[u]
+        const x = e.x + (apex.x - e.x) * t
+        const z = e.z + (apex.z - e.z) * t
+        const f = faceness[u]
+        let y: number
+        if (upper) {
+          const edge = mid + (faceTop - mid) * f
+          const top = h * (1.02 - 0.18 * (z / d)) // crown falls away toward the back
+          y = edge + (top - edge) * dome
+        } else {
+          const edge = mid - (mid - faceBottom) * f
+          y = edge - (edge - 0.0012) * dome
+        }
+        pos.push(x, y, z)
+        uv.push(x / w, z / d)
+        // Two-tone crown on the MAX head: dark band behind the face.
+        const dark = style === 'max' && upper && z < 0.14 * d + 0.02 * d * Math.sin(x * 60) ? 1 : 0
+        const c1 = dark ? 0.12 : 1
+        col.push(c1, c1, c1)
+      }
+    }
+    const idx: number[] = []
+    for (let v = 0; v < V; v++) {
+      for (let u = 0; u < U; u++) {
+        const a = v * U + u
+        const b = v * U + ((u + 1) % U)
+        const c2 = a + U
+        const d2 = b + U
+        if (upper) idx.push(a, c2, b, b, c2, d2)
+        else idx.push(a, b, c2, b, d2, c2)
+      }
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+    geo.setIndex(idx)
+    return geo
+  }
+
+  // The face: a band between the crown edge and sole edge (zero height away from the front).
+  const facePos: number[] = []
+  const faceUv: number[] = []
+  const faceIdx: number[] = []
+  for (let u = 0; u <= U; u++) {
+    const e = ring[u % U]
+    const f = faceness[u % U]
+    const top = mid + (faceTop - mid) * f
+    const bot = mid - (mid - faceBottom) * f
+    facePos.push(e.x, top, e.z, e.x, bot, e.z)
+    faceUv.push(1 - e.x / w, 1, 1 - e.x / w, 0)
+    if (u < U) {
+      const a = u * 2
+      faceIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3)
+    }
+  }
+  const faceGeo = new THREE.BufferGeometry()
+  faceGeo.setAttribute('position', new THREE.Float32BufferAttribute(facePos, 3))
+  faceGeo.setAttribute('uv', new THREE.Float32BufferAttribute(faceUv, 2))
+  faceGeo.setIndex(faceIdx)
+
+  // Loft: lean the front of the head back, fading out toward the rear.
+  const k = Math.tan(THREE.MathUtils.degToRad(c.loft))
+  const loft = (geo: THREE.BufferGeometry) => {
+    const p = geo.attributes.position
+    for (let i = 0; i < p.count; i++) {
+      const z = p.getZ(i)
+      const wgt = 1 - sst(0, 0.4 * d, z)
+      p.setZ(i, z + (p.getY(i) - faceBottom) * k * wgt)
     }
     geo.computeVertexNormals()
     return geo
   }
+
   const crownMat =
-    line.head === 'speed'
-      ? new THREE.MeshPhysicalMaterial({ map: carbonTex(), metalness: 0.2, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.08 })
-      : line.head === 'tour'
-        ? new THREE.MeshPhysicalMaterial({ color: 0x1a1c1f, metalness: 0.3, roughness: 0.42, clearcoat: 0.5 })
-        : new THREE.MeshPhysicalMaterial({ color: 0x2b313a, metalness: 0.5, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 })
-  const crown = new THREE.Mesh(shape(true), crownMat)
-  const sole = new THREE.Mesh(shape(false), m.titanium)
-  g.add(crown, sole)
-  // Face insert
-  // Face insert: a rounded plate sitting just proud of the flat face.
-  const fh = dims.h * 0.66
-  const fw = dims.w * 0.66
-  const fs = new THREE.Shape()
-  const r = Math.min(fh, fw) * 0.3
-  const x0 = -fw / 2
-  const y0 = -fh / 2
-  fs.moveTo(x0 + r, y0)
-  fs.lineTo(x0 + fw - r, y0)
-  fs.quadraticCurveTo(x0 + fw, y0, x0 + fw, y0 + r)
-  fs.lineTo(x0 + fw, y0 + fh - r)
-  fs.quadraticCurveTo(x0 + fw, y0 + fh, x0 + fw - r, y0 + fh)
-  fs.lineTo(x0 + r, y0 + fh)
-  fs.quadraticCurveTo(x0, y0 + fh, x0, y0 + fh - r)
-  fs.lineTo(x0, y0 + r)
-  fs.quadraticCurveTo(x0, y0, x0 + r, y0)
-  const fgeo = new THREE.ShapeGeometry(fs, 12)
-  const fuv = fgeo.attributes.uv
-  const fpos = fgeo.attributes.position
-  for (let i = 0; i < fuv.count; i++) fuv.setXY(i, fpos.getX(i) / fw + 0.5, fpos.getY(i) / fh + 0.5)
-  fgeo.rotateY(Math.PI)
-  const face = new THREE.Mesh(fgeo, new THREE.MeshPhysicalMaterial({ map: faceTex('wood'), metalness: 0.9, roughness: 0.35 }))
-  face.position.set(dims.w * 0.53, dims.h * 0.5, faceZ(dims.h * 0.5) - 0.0006)
-  face.rotation.x = THREE.MathUtils.degToRad(loft)
-  g.add(face)
-  // Alignment mark on the crown, sole weights and a painted accent.
-  const mark = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.0012, 0.004), line.head === 'tour' ? m.paint : m.white)
-  mark.position.set(dims.w * 0.52, dims.h * 0.99, faceZ(dims.h) + 0.014)
-  g.add(mark)
-  for (const [x, z] of [
-    [0.3, 0.3],
-    [0.72, 0.36],
-  ]) {
-    const wgt = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 20), m.chrome)
-    wgt.position.set(dims.w * x, 0.0022, dims.d * z)
-    g.add(wgt)
+    style === 'speed'
+      ? new THREE.MeshPhysicalMaterial({ map: carbonTex(), metalness: 0.2, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.06 })
+      : style === 'tour'
+        ? new THREE.MeshPhysicalMaterial({ color: 0x0e0f11, metalness: 0.1, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.04 })
+        : new THREE.MeshPhysicalMaterial({ color: 0xd9d4ca, vertexColors: true, metalness: 0.05, roughness: 0.45, clearcoat: 0.6 })
+  const soleMat = new THREE.MeshPhysicalMaterial({ map: soleTex(line), metalness: 0.85, roughness: 0.35 })
+  const faceMat = new THREE.MeshPhysicalMaterial({ map: woodFaceTex(style), metalness: style === 'speed' ? 0.3 : 0.8, roughness: 0.4, clearcoat: style === 'speed' ? 1 : 0, side: THREE.DoubleSide })
+  const soleGeo = build(false)
+  // Height of the (un-lofted) sole under a point, from the nearest vertex.
+  const soleY = (x: number, z: number) => {
+    const p = soleGeo.attributes.position
+    let best = Infinity
+    let y = 0
+    for (let i = 0; i < p.count; i++) {
+      const dd = (p.getX(i) - x) ** 2 + (p.getZ(i) - z) ** 2
+      if (dd < best) {
+        best = dd
+        y = p.getY(i)
+      }
+    }
+    return y
   }
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(dims.w * 0.5, 0.0015, dims.d * 0.12), m.paint)
-  stripe.position.set(dims.w * 0.55, 0.0012, dims.d * 0.1)
-  g.add(stripe)
-  return { g, hoselTop: new THREE.Vector3(0.004, dims.h * 1.15, -dims.d * 0.25), hoselR: 0.0078, sleeve: true, body: m.titanium as THREE.Material }
+  g.add(new THREE.Mesh(loft(build(true)), crownMat), new THREE.Mesh(loft(soleGeo), soleMat), new THREE.Mesh(loft(faceGeo), faceMat))
+
+  // Alignment aid on the crown, just behind the face centre.
+  const aidZ = 0.06 * d + (faceTop - faceBottom) * k * 0.6
+  if (style === 'tour') {
+    const aid = new THREE.Mesh(new THREE.BoxGeometry(0.0012, 0.0006, 0.01), m.white)
+    aid.position.set(0.52 * w, h * 1.01, aidZ)
+    g.add(aid)
+  } else {
+    const tri = new THREE.Shape()
+    tri.moveTo(-0.005, 0)
+    tri.lineTo(0.005, 0)
+    tri.lineTo(0, 0.008)
+    tri.closePath()
+    const aid = new THREE.Mesh(new THREE.ShapeGeometry(tri), style === 'speed' ? m.paint : m.white)
+    aid.rotation.x = -Math.PI / 2
+    aid.position.set(0.52 * w, h * 1.015, aidZ + 0.008)
+    g.add(aid)
+  }
+  // Sole weights: a sliding track on the tour head, a big rear weight on MAX, front and back on Speed.
+  const weight = (x: number, z: number, r: number) => {
+    const wt = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.004, 24), m.chrome)
+    wt.position.set(x, soleY(x, z) + 0.0008, z)
+    g.add(wt)
+  }
+  if (c.id === 'dr' || c.wood) {
+    if (style === 'tour') {
+      const track = new THREE.Mesh(new RoundedBoxGeometry(w * 0.55, 0.003, 0.012, 2, 0.0014), m.blackPvd)
+      track.position.set(0.5 * w, soleY(0.5 * w, 0.78 * d) + 0.0006, 0.78 * d)
+      g.add(track)
+      weight(0.6 * w, 0.78 * d, 0.006)
+    } else if (style === 'max') weight(0.5 * w, 0.8 * d, 0.011)
+    else {
+      weight(0.5 * w, 0.18 * d, 0.006)
+      weight(0.45 * w, 0.85 * d, 0.007)
+    }
+  }
+  const hoselTop = new THREE.Vector3(0.012 * w, h + (c.id === 'dr' ? 0.02 : 0.018), 0.14 * d)
+  return { g, hoselTop, hoselR: 0.0072, sleeve: c.id === 'dr' || c.id === '3w', body: m.blackPvd as THREE.Material }
 }
 
 // ---------- irons & wedges ----------
-function ironProfile(len: number, toeH: number, heelH: number, round: number) {
+function ironProfile(len: number, toeH: number, heelH: number, wedge: boolean) {
   const s = new THREE.Shape()
-  s.moveTo(0.006, 0)
-  s.lineTo(len - 0.01, 0)
-  s.quadraticCurveTo(len + 0.004, 0.004, len + 0.002, toeH * 0.55)
-  s.quadraticCurveTo(len - 0.002 + round, toeH, len - 0.03, toeH * 0.98)
-  s.lineTo(0.012, heelH)
-  s.quadraticCurveTo(0.002, heelH * 0.9, 0.002, heelH * 0.5)
-  s.closePath()
+  s.moveTo(0.009, 0)
+  s.lineTo(len - 0.016, 0)
+  // Rounded toe: taller and rounder on wedges.
+  s.bezierCurveTo(len - 0.002, 0.0005, len + 0.002, toeH * 0.45, len - 0.002, toeH * (wedge ? 0.8 : 0.72))
+  s.bezierCurveTo(len - 0.006, toeH * 0.98, len - 0.018, toeH * 1.02, len - 0.03, toeH)
+  // Topline sloping down toward the heel.
+  s.lineTo(0.022, heelH + 0.002)
+  s.bezierCurveTo(0.012, heelH, 0.004, heelH * 0.75, 0.003, heelH * 0.45)
+  s.bezierCurveTo(0.002, 0.004, 0.004, 0.0005, 0.009, 0)
   return s
 }
 
@@ -301,140 +472,196 @@ function ironHead(c: Club, line: ClubLine, m: M) {
   const g = new THREE.Group()
   const wedge = line.slot === 'wedges'
   const style = line.head
-  const len = style === 'gi' ? 0.084 : style === 'blade' ? 0.074 : wedge ? 0.078 : 0.079
-  const toeH = (wedge ? 0.058 : 0.05) + (style === 'gi' ? 0.003 : 0)
-  const heelH = wedge ? 0.028 : 0.022
-  const body = style === 'spinmill' ? m.raw : style === 'blade' || style === 'cavity' ? m.satin : m.chrome
-  const profile = ironProfile(len, toeH, heelH, wedge ? 0.012 : 0)
+  const len = style === 'gi' ? 0.083 : style === 'blade' ? 0.075 : wedge ? 0.077 : 0.079
+  const toeH = (wedge ? 0.056 : 0.049) + (style === 'gi' ? 0.002 : 0) - (c.loft < 30 ? 0.003 : 0)
+  const heelH = wedge ? 0.028 : 0.021
+  const bodyMat =
+    style === 'spinmill'
+      ? m.raw
+      : style === 'blade' || style === 'cavity' || style === 'chrome'
+        ? m.satin
+        : m.chrome
+  const profile = ironProfile(len, toeH, heelH, wedge)
+  const faceMap = ironFaceTex(style === 'spinmill').clone()
+  faceMap.repeat.set(1 / len, 1 / toeH)
+  faceMap.needsUpdate = true
+  const faceMat = new THREE.MeshPhysicalMaterial({ map: faceMap, metalness: 0.95, roughness: style === 'spinmill' ? 0.5 : 0.3 })
 
-  const parts: THREE.BufferGeometry[] = []
-  // Face plate
-  parts.push(new THREE.ExtrudeGeometry(profile, { depth: 0.006, bevelEnabled: true, bevelSize: 0.0012, bevelThickness: 0.001, bevelSegments: 2, curveSegments: 24 }))
+  const soft = (sh: THREE.Shape, depth: number, bevel: number) =>
+    new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 4, curveSegments: 28 })
+
+  // Face plate: caps carry the grooved face, sides are the body finish.
+  const plate = soft(profile, 0.004, 0.0009)
+  loftShear(plate, c.loft)
+  g.add(new THREE.Mesh(plate, [faceMat, bodyMat]))
+
+  const back: THREE.BufferGeometry[] = []
+  const lowerBand = (top: number, inset: number) => {
+    const s2 = new THREE.Shape()
+    s2.moveTo(0.012 + inset, 0.002)
+    s2.lineTo(len - 0.016 - inset, 0.002)
+    s2.bezierCurveTo(len - 0.006 - inset, top * 0.4, len - 0.01 - inset, top * 0.85, len - 0.024 - inset, top)
+    s2.bezierCurveTo(len * 0.6, top * 0.92, len * 0.3, top * 0.78, 0.02 + inset, top * 0.6)
+    s2.closePath()
+    return s2
+  }
   if (style === 'blade' || style === 'chrome' || style === 'spinmill') {
-    // Muscle back: extra mass low behind the sweet spot, tapering up.
-    const mb = new THREE.Shape()
-    mb.moveTo(0.012, 0.002)
-    mb.lineTo(len - 0.014, 0.002)
-    mb.quadraticCurveTo(len - 0.004, toeH * 0.3, len - 0.018, toeH * 0.45)
-    mb.lineTo(0.02, heelH * 0.75)
-    mb.closePath()
-    const back = new THREE.ExtrudeGeometry(mb, { depth: 0.009, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 3, curveSegments: 16 })
-    back.translate(0, 0, 0.006)
-    parts.push(back)
-  } else {
-    // Cavity back: perimeter ring with a hollow in the middle.
-    const ring = ironProfile(len, toeH, heelH, 0)
+    // Muscle back: a soft, sculpted mass low and centred.
+    const muscle = soft(lowerBand(toeH * (wedge ? 0.62 : 0.55), 0.004), 0.004, 0.0032)
+    muscle.translate(0, 0, 0.0048)
+    back.push(muscle)
+  } else if (style === 'cavity') {
+    // Players cavity: thin perimeter, a sculpted lower bar and a badge.
+    const ring = ironProfile(len, toeH, heelH, wedge)
     const hole = new THREE.Path()
-    const inset = style === 'gi' ? 0.009 : 0.007
-    hole.moveTo(0.012 + inset, inset + (style === 'gi' ? 0.008 : 0.004))
-    hole.lineTo(len - 0.01 - inset, inset + (style === 'gi' ? 0.008 : 0.004))
-    hole.quadraticCurveTo(len - inset, toeH * 0.5, len - 0.03, toeH - inset)
-    hole.lineTo(0.016, heelH - inset * 0.4)
-    hole.closePath()
+    hole.moveTo(0.016, 0.009)
+    hole.lineTo(len - 0.02, 0.009)
+    hole.bezierCurveTo(len - 0.009, toeH * 0.4, len - 0.011, toeH * 0.75, len - 0.03, toeH - 0.0055)
+    hole.lineTo(0.024, heelH - 0.002)
+    hole.bezierCurveTo(0.016, heelH - 0.004, 0.014, 0.014, 0.016, 0.009)
     ring.holes.push(hole)
-    const rim = new THREE.ExtrudeGeometry(ring, { depth: style === 'gi' ? 0.014 : 0.01, bevelEnabled: true, bevelSize: 0.0015, bevelThickness: 0.0015, bevelSegments: 2, curveSegments: 16 })
-    rim.translate(0, 0, 0.006)
-    parts.push(rim)
+    const rim = soft(ring, 0.004, 0.0012)
+    rim.translate(0, 0, 0.0048)
+    back.push(rim)
+    const bar = soft(lowerBand(toeH * 0.32, 0.006), 0.004, 0.002)
+    bar.translate(0, 0, 0.0048)
+    back.push(bar)
+  } else {
+    // Hollow-body / game-improvement: closed back, wide sole, toe weight.
+    const shell = soft(ironProfile(len - 0.002, toeH - 0.003, heelH - 0.001, wedge), 0.011, 0.0022)
+    shell.translate(0.001, 0.0005, 0.0048)
+    back.push(shell)
+    const flange = new RoundedBoxGeometry(len - 0.02, 0.009, style === 'widesole' ? 0.03 : 0.026, 3, 0.0038)
+    flange.translate(len / 2, 0.0046, 0.013)
+    back.push(flange.toNonIndexed())
   }
-  if (style === 'gi' || style === 'widesole') {
-    // Wide sole flange for bounce and a low CG.
-    const flange = new RoundedBoxGeometry(len - 0.016, 0.01, style === 'gi' ? 0.03 : 0.028, 2, 0.004)
-    flange.translate(len / 2, 0.005, 0.016)
-    parts.push(flange.toNonIndexed())
-  }
-  const merged = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)))!
-  loftShear(merged, c.loft)
-  g.add(new THREE.Mesh(merged, body))
+  const backGeo = mergeGeometries(back.map((b) => (b.index ? b.toNonIndexed() : b)).map((b) => {
+    b.clearGroups()
+    return b
+  }))!
+  loftShear(backGeo, c.loft)
+  g.add(new THREE.Mesh(backGeo, bodyMat))
 
-  // Grooved, milled face, lofted with the body.
-  const fg = new THREE.PlaneGeometry(len * 0.72, toeH * 0.62)
-  fg.rotateY(Math.PI)
-  fg.translate(len * 0.52, toeH * 0.38, -0.0024)
-  loftShear(fg, c.loft)
-  const face = new THREE.Mesh(fg, new THREE.MeshPhysicalMaterial({ map: faceTex(style === 'spinmill' ? 'spin' : 'iron'), metalness: 0.95, roughness: style === 'spinmill' ? 0.5 : 0.28 }))
-  g.add(face)
-
-  // Cavity badge / back stamp with the model and loft.
-  const badgeGeo = new THREE.PlaneGeometry(len * 0.5, toeH * 0.32)
-  badgeGeo.translate(len * 0.5, toeH * 0.42, style === 'gi' ? 0.0125 : style === 'cavity' ? 0.0105 : 0.0163)
+  // Badge / stamp on the back.
+  const badgeZ = style === 'gi' || style === 'widesole' ? 0.0184 : style === 'cavity' ? 0.0092 : 0.0122
+  const badgeGeo = new THREE.PlaneGeometry(len * (style === 'cavity' ? 0.46 : 0.4), toeH * 0.2)
+  badgeGeo.translate(len * 0.52, toeH * (style === 'cavity' ? 0.46 : 0.3), badgeZ)
   loftShear(badgeGeo, c.loft)
   const label = wedge ? `${c.loft}°` : c.short.replace('i', '')
-  const badge = new THREE.Mesh(
-    badgeGeo,
-    new THREE.MeshPhysicalMaterial({ map: badgeTex(line.brand, `${line.model} · ${label}`, style === 'blade' || style === 'chrome' ? 0x2a2f36 : line.accent), metalness: 0.4, roughness: 0.3, clearcoat: 1 }),
+  g.add(
+    new THREE.Mesh(
+      badgeGeo,
+      new THREE.MeshPhysicalMaterial({ map: badgeTex(line.brand, `${line.model} · ${label}`, style === 'blade' || style === 'chrome' || style === 'spinmill' ? 0x2a2f36 : line.accent), metalness: 0.4, roughness: 0.3, clearcoat: 1, transparent: true }),
+    ),
   )
-  g.add(badge)
-  return { g, hoselTop: new THREE.Vector3(0.001, 0.075, 0.006), hoselR: 0.0068, sleeve: false, body: body as THREE.Material }
+  if (style === 'gi') {
+    // Toe weight screw.
+    const screw = new THREE.Mesh(new THREE.CylinderGeometry(0.0038, 0.0038, 0.002, 20), m.chrome)
+    screw.rotation.x = Math.PI / 2
+    screw.position.set(len - 0.012, toeH * 0.28, 0.0175 + toeH * 0.28 * Math.tan(THREE.MathUtils.degToRad(c.loft)))
+    g.add(screw)
+  }
+  return { g, hoselTop: new THREE.Vector3(-0.001, 0.068, 0.004), hoselR: 0.0064, sleeve: false, body: bodyMat as THREE.Material }
 }
 
 // ---------- putters ----------
+// Heads are drawn in top view (x = heel -> toe, second coord = face -> back)
+// and extruded upward.
+function upward(shape: THREE.Shape, height: number, bevel = 0.0012) {
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 3, curveSegments: 20 })
+  geo.rotateX(Math.PI / 2) // shape y -> +z (back), extrusion -> -y
+  geo.translate(0, height + bevel, 0)
+  return geo
+}
+function rrect(x0: number, z0: number, x1: number, z1: number, r: number) {
+  const s = new THREE.Shape()
+  s.moveTo(x0 + r, z0)
+  s.lineTo(x1 - r, z0)
+  s.quadraticCurveTo(x1, z0, x1, z0 + r)
+  s.lineTo(x1, z1 - r)
+  s.quadraticCurveTo(x1, z1, x1 - r, z1)
+  s.lineTo(x0 + r, z1)
+  s.quadraticCurveTo(x0, z1, x0, z1 - r)
+  s.lineTo(x0, z0 + r)
+  s.quadraticCurveTo(x0, z0, x0 + r, z0)
+  return s
+}
+
 function putterHead(line: ClubLine, m: M) {
   const g = new THREE.Group()
-  const finish = line.head === 'milled' ? m.satin : line.head === 'mallet' ? m.blackPvd : m.chrome
+  const finish = line.head === 'milled' || line.head === 'mallet' ? m.blackPvd : m.satin
+  const parts: THREE.BufferGeometry[] = []
   let hoselTop: THREE.Vector3
   if (line.head === 'mallet') {
-    // Fang-style mallet: crescent body with rear wings and sightlines.
+    // Spider-style: face bar with two wide wings sweeping back around a cut-out.
     const s = new THREE.Shape()
-    s.moveTo(-0.05, 0)
-    s.lineTo(0.05, 0)
-    s.quadraticCurveTo(0.058, 0.035, 0.045, 0.085)
-    s.lineTo(0.022, 0.085)
-    s.lineTo(0.016, 0.03)
-    s.lineTo(-0.016, 0.03)
-    s.lineTo(-0.022, 0.085)
-    s.lineTo(-0.045, 0.085)
-    s.quadraticCurveTo(-0.058, 0.035, -0.05, 0)
-    const body = new THREE.ExtrudeGeometry(s, { depth: 0.022, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 3, curveSegments: 20 })
-    body.rotateX(Math.PI / 2)
-    body.translate(0.055, 0.024, 0.002)
-    g.add(new THREE.Mesh(body, finish))
-    for (const x of [-0.018, 0, 0.018]) {
-      const line2 = new THREE.Mesh(new THREE.BoxGeometry(0.0022, 0.0008, x === 0 ? 0.08 : 0.05), m.white)
-      line2.position.set(0.055 + x, 0.0265, x === 0 ? 0.042 : 0.06)
-      g.add(line2)
+    s.moveTo(0.004, 0)
+    s.lineTo(0.106, 0)
+    s.bezierCurveTo(0.114, 0.02, 0.118, 0.07, 0.1, 0.098)
+    s.bezierCurveTo(0.085, 0.112, 0.025, 0.112, 0.01, 0.098)
+    s.bezierCurveTo(-0.008, 0.07, -0.004, 0.02, 0.004, 0)
+    const cut = new THREE.Path()
+    cut.moveTo(0.04, 0.03)
+    cut.lineTo(0.07, 0.03)
+    cut.bezierCurveTo(0.08, 0.055, 0.075, 0.085, 0.055, 0.09)
+    cut.bezierCurveTo(0.035, 0.085, 0.03, 0.055, 0.04, 0.03)
+    s.holes.push(cut)
+    parts.push(upward(s, 0.022))
+    g.add(new THREE.Mesh(mergeGeometries(parts)!, finish))
+    // White T sightline and rear weights.
+    const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.0008, 0.024), m.white)
+    t1.position.set(0.055, 0.0245, 0.014)
+    const t2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.0008, 0.003), m.white)
+    t2.position.set(0.055, 0.0245, 0.0265)
+    g.add(t1, t2)
+    for (const x of [0.02, 0.09]) {
+      const wt = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.006, 20), m.paint)
+      wt.position.set(x, 0.012, 0.094)
+      wt.rotation.x = Math.PI / 2
+      g.add(wt)
     }
-    for (const x of [-0.034, 0.034]) {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.004, 18), m.paint)
-      w.rotation.x = Math.PI / 2
-      w.position.set(0.055 + x, 0.012, 0.089)
-      g.add(w)
-    }
-    hoselTop = new THREE.Vector3(0.03, 0.08, 0.012)
-    // Slant neck from the body up to the shaft.
-    const from = new THREE.Vector3(0.042, 0.024, 0.01)
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0048, from.distanceTo(hoselTop), 12), finish)
+    // Short slant neck.
+    hoselTop = new THREE.Vector3(0.028, 0.075, 0.01)
+    const from = new THREE.Vector3(0.04, 0.022, 0.006)
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0048, from.distanceTo(hoselTop), 14), finish)
     neck.position.copy(from).add(hoselTop).multiplyScalar(0.5)
     neck.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), hoselTop.clone().sub(from).normalize())
     g.add(neck)
   } else {
-    // Classic Anser-style blade with a plumber's neck.
-    const body = new RoundedBoxGeometry(0.1, 0.026, 0.024, 4, 0.004)
-    body.translate(0.055, 0.013, 0.012)
-    g.add(new THREE.Mesh(body, finish))
-    const flange = new RoundedBoxGeometry(0.07, 0.01, 0.018, 3, 0.003)
-    flange.translate(0.055, 0.005, 0.03)
-    g.add(new THREE.Mesh(flange, finish))
-    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.0008, 0.016), m.white)
-    sight.position.set(0.055, 0.0265, 0.012)
-    g.add(sight)
-    if (line.head === 'milled') {
-      const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.001, 16), m.paint)
-      dot.position.set(0.055, 0.0012, 0.03)
-      g.add(dot)
+    // Newport-style blade: face bar, heel and toe bumpers, low flange behind.
+    parts.push(upward(rrect(0.004, 0, 0.102, 0.009, 0.002), 0.024))
+    parts.push(upward(rrect(0.004, 0, 0.022, 0.03, 0.005), 0.024))
+    parts.push(upward(rrect(0.084, 0, 0.102, 0.03, 0.005), 0.024))
+    parts.push(upward(rrect(0.004, 0.004, 0.102, 0.032, 0.006), 0.008))
+    g.add(new THREE.Mesh(mergeGeometries(parts)!, finish))
+    // Cavity paint fill and sight dot.
+    const fill = new THREE.Mesh(new THREE.PlaneGeometry(0.058, 0.018), new THREE.MeshStandardMaterial({ color: 0x1a1d21, roughness: 0.6 }))
+    fill.rotation.x = -Math.PI / 2
+    fill.position.set(0.053, 0.0103, 0.02)
+    g.add(fill)
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.0006, 16), line.head === 'milled' ? m.paint : new THREE.MeshStandardMaterial({ color: 0xd4252b }))
+    dot.position.set(0.053, 0.0252, 0.0045)
+    g.add(dot)
+    // Plumber's neck: post, bridge, then up into the shaft.
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0045, 0.012, 14), finish)
+    post.position.set(0.013, 0.031, 0.0045)
+    const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0042, 0.018, 14), finish)
+    bridge.rotation.z = Math.PI / 2
+    bridge.position.set(0.004, 0.038, 0.0045)
+    const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.0042, 0.0045, 0.014, 14), finish)
+    riser.position.set(-0.005, 0.045, 0.0045)
+    for (const p of [new THREE.Vector3(0.013, 0.038, 0.0045), new THREE.Vector3(-0.005, 0.038, 0.0045)]) {
+      const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0043, 14, 10), finish)
+      knuckle.position.copy(p)
+      g.add(knuckle)
     }
-    // Plumber's neck: up, over, up.
-    const neck1 = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.018, 12), finish)
-    neck1.position.set(0.012, 0.035, 0.008)
-    const neck2 = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.014, 12), finish)
-    neck2.rotation.z = Math.PI / 2
-    neck2.position.set(0.006, 0.044, 0.008)
-    g.add(neck1, neck2)
-    hoselTop = new THREE.Vector3(0.0, 0.05, 0.008)
+    g.add(post, bridge, riser)
+    hoselTop = new THREE.Vector3(-0.005, 0.052, 0.0045)
   }
-  // Milled face
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.02), new THREE.MeshPhysicalMaterial({ map: faceTex('putter'), metalness: 0.9, roughness: 0.4 }))
+  // Milled face.
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.094, 0.02), new THREE.MeshPhysicalMaterial({ map: faceTex('putter'), metalness: 0.9, roughness: 0.4 }))
   face.rotation.y = Math.PI
-  face.position.set(0.055, 0.013, -0.0005)
+  face.position.set(0.055, 0.013, -0.0014)
   g.add(face)
   return { g, hoselTop, hoselR: 0.0045, sleeve: false, body: finish as THREE.Material }
 }
@@ -447,7 +674,8 @@ export interface BuiltClub {
   materials: THREE.Material[]
 }
 
-export function buildClubModel(c: Club, line: ClubLine, shadows: boolean): BuiltClub {
+// `stub` builds just the head with a short piece of shaft, for close-ups.
+export function buildClubModel(c: Club, line: ClubLine, shadows: boolean, stub = false): BuiltClub {
   const m = mats(line)
   const root = new THREE.Group()
   const built = c.putter ? putterHead(line, m) : c.wood ? woodHead(c, line, m) : ironHead(c, line, m)
@@ -481,7 +709,7 @@ export function buildClubModel(c: Club, line: ClubLine, shadows: boolean): Built
   // Shaft: graphite with a graphic band for woods; stepped steel for irons.
   const shaftStart = (built.sleeve ? 0.022 : 0) + 0.018
   const gripLen = 0.27
-  const shaftEnd = total - gripLen + 0.01
+  const shaftEnd = stub ? shaftStart + 0.09 : total - gripLen + 0.01
   if (line.shaft === 'graphite') {
     const mat = new THREE.MeshPhysicalMaterial({ map: graphiteTex(line.brand, line.accent), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 })
     cyl(0.0048, 0.0072, shaftStart, shaftEnd, mat, 20)
@@ -502,6 +730,7 @@ export function buildClubModel(c: Club, line: ClubLine, shadows: boolean): Built
       a += stepLen
     }
   }
+  if (stub) return finishModel(root, hands, dir, built.g, shadows)
   // Grip: taper toward the lower hand, textured, with an end cap.
   const gripMat = new THREE.MeshStandardMaterial({ map: gripTex(line.brand, line.accent), roughness: 0.85 })
   if (c.putter) {
@@ -514,13 +743,16 @@ export function buildClubModel(c: Club, line: ClubLine, shadows: boolean): Built
   cap.position.copy(along(total))
   root.add(cap)
 
+  return finishModel(root, hands, dir, built.g, shadows)
+}
+
+function finishModel(root: THREE.Group, hands: THREE.Vector3, dir: THREE.Vector3, head: THREE.Group, shadows: boolean): BuiltClub {
   const materials: THREE.Material[] = []
   root.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
     mesh.castShadow = shadows
-    const mm = mesh.material as THREE.Material
-    if (!materials.includes(mm)) materials.push(mm)
+    for (const mm of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) if (!materials.includes(mm)) materials.push(mm)
   })
-  return { root, hands, dir, head: built.g, materials }
+  return { root, hands, dir, head, materials }
 }

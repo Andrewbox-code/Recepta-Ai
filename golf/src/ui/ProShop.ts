@@ -25,10 +25,11 @@ function studio() {
     m.lookAt(0, 0, 0)
     s.add(m)
   }
-  box(7, 0.8, [0, 7, -2], 1.8) // overhead strip
-  box(1.2, 6, [-7, 1, -4], 1.4) // key softbox
-  box(1.2, 6, [7, 1, 3], 0.9) // rim
-  box(4, 0.5, [2, -1, -7], 0.5) // low kicker from the front
+  box(7, 1.4, [0, 7, -2], 2.2) // overhead strip
+  box(2, 6, [-7, 1, -4], 1.8) // key softbox
+  box(2, 6, [7, 1, 3], 1.2) // rim
+  box(3, 5, [6, 2, -6], 1.3) // toe-side fill
+  box(5, 0.8, [2, -1, -7], 0.6) // low kicker from the front
   return s
 }
 
@@ -98,7 +99,8 @@ export class ProShop {
     this.ensureRenderer()
     this.render()
     const loop = () => {
-      if (!this.frozen) this.turntable.rotation.y += 0.008
+      // Gentle sway rather than a full spin, so the head stays readable.
+      if (!this.frozen) this.turntable.rotation.y = Math.sin(performance.now() / 1600) * 0.9
       this.renderer?.render(this.scene, this.camera)
       this.raf = requestAnimationFrame(loop)
     }
@@ -154,14 +156,17 @@ export class ProShop {
     }
     const line = lineById(id)!
     const club: Club = clubById(PREVIEW_CLUB[this.tab])
-    const built = buildClubModel(club, line, false)
+    const built = buildClubModel(club, line, false, true)
     // Spin around the centre of the head.
     const box = new THREE.Box3().setFromObject(built.head)
     const c = box.getCenter(new THREE.Vector3())
     built.root.position.sub(c)
     this.turntable.add(built.root)
     const size = box.getSize(new THREE.Vector3()).length()
-    this.camera.position.set(size * 0.5, size * 0.55, -size * 1.9)
+    // Catalogue angles: woods from the front-toe side to show crown and face;
+    // irons, wedges and putters face-on.
+    if (club.wood) this.camera.position.set(size * 1.2, size * 0.7, -size * 1.4)
+    else this.camera.position.set(size * 0.15, size * 0.35, -size * 1.9)
     this.camera.lookAt(0, 0, 0)
     ;(this.root.querySelector('#shopCaption') as HTMLElement).textContent = `${line.brand} ${line.model} · shown as ${club.name}`
   }
