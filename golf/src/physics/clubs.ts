@@ -16,19 +16,49 @@ export interface Club {
   tiltGain: number // spin-axis tilt degrees per degree of face-to-path
   gear: number // gear-effect strength (woods high, irons low)
   wood: boolean
-  sound: 'driver' | 'wood' | 'iron' | 'wedge'
+  putter?: boolean
+  sound: 'driver' | 'wood' | 'iron' | 'wedge' | 'putter'
 }
 
 const mph = (v: number) => v * 0.44704
 
-export const CLUBS: Club[] = [
-  { id: 'dr', name: 'Driver', short: 'DR', loft: 10.5, maxSpeed: mph(108), smash: 1.48, launch: 12.5, spin: 2650, faceWeight: 0.85, tiltGain: 2.6, gear: 1, wood: true, sound: 'driver' },
-  { id: '3w', name: '3 Wood', short: '3W', loft: 15, maxSpeed: mph(103), smash: 1.46, launch: 11, spin: 3600, faceWeight: 0.82, tiltGain: 2.2, gear: 0.8, wood: true, sound: 'wood' },
-  { id: '5i', name: '5 Iron', short: '5i', loft: 26, maxSpeed: mph(92), smash: 1.37, launch: 12.5, spin: 5300, faceWeight: 0.78, tiltGain: 1.7, gear: 0.25, wood: false, sound: 'iron' },
-  { id: '7i', name: '7 Iron', short: '7i', loft: 33, maxSpeed: mph(87), smash: 1.33, launch: 16.5, spin: 7000, faceWeight: 0.75, tiltGain: 1.45, gear: 0.2, wood: false, sound: 'iron' },
-  { id: '9i', name: '9 Iron', short: '9i', loft: 41, maxSpeed: mph(82), smash: 1.28, launch: 20.5, spin: 8600, faceWeight: 0.72, tiltGain: 1.25, gear: 0.15, wood: false, sound: 'iron' },
-  { id: 'pw', name: 'Pitching Wedge', short: 'PW', loft: 46, maxSpeed: mph(81), smash: 1.27, launch: 24, spin: 9300, faceWeight: 0.7, tiltGain: 1.1, gear: 0.1, wood: false, sound: 'wedge' },
-  { id: 'sw', name: 'Sand Wedge', short: 'SW', loft: 56, maxSpeed: mph(76), smash: 1.2, launch: 30, spin: 9800, faceWeight: 0.66, tiltGain: 0.95, gear: 0.1, wood: false, sound: 'wedge' },
+type Row = [string, string, string, number, number, number, number, number, number, number, number, Club['sound']]
+// id, name, short, loft, club mph, smash, launch, spin, faceWeight, tiltGain, gear, sound
+const ROWS: Row[] = [
+  ['dr', 'Driver', 'DR', 10.5, 108, 1.48, 12.5, 2650, 0.85, 2.6, 1, 'driver'],
+  ['3w', '3 Wood', '3W', 15, 103, 1.46, 11, 3600, 0.82, 2.2, 0.8, 'wood'],
+  ['5w', '5 Wood', '5W', 18, 100, 1.44, 12, 4300, 0.81, 2.0, 0.7, 'wood'],
+  ['3h', '3 Hybrid', '3H', 20, 97.5, 1.42, 12, 4500, 0.8, 1.9, 0.5, 'wood'],
+  ['4i', '4 Iron', '4i', 23, 95, 1.39, 11.5, 4900, 0.79, 1.8, 0.3, 'iron'],
+  ['5i', '5 Iron', '5i', 26, 92, 1.37, 12.5, 5300, 0.78, 1.7, 0.25, 'iron'],
+  ['6i', '6 Iron', '6i', 29.5, 89.5, 1.35, 14.5, 6100, 0.77, 1.6, 0.22, 'iron'],
+  ['7i', '7 Iron', '7i', 33, 87, 1.33, 16.5, 7000, 0.75, 1.45, 0.2, 'iron'],
+  ['8i', '8 Iron', '8i', 37, 84.5, 1.31, 18.5, 7800, 0.74, 1.35, 0.18, 'iron'],
+  ['9i', '9 Iron', '9i', 41, 82, 1.28, 20.5, 8600, 0.72, 1.25, 0.15, 'iron'],
+  ['pw', 'Pitching Wedge', 'PW', 46, 81, 1.27, 24, 9300, 0.7, 1.1, 0.1, 'wedge'],
+  ['gw', 'Gap Wedge', 'GW', 50, 78.5, 1.23, 27, 9600, 0.68, 1.02, 0.1, 'wedge'],
+  ['sw', 'Sand Wedge', 'SW', 56, 76, 1.2, 30, 9800, 0.66, 0.95, 0.1, 'wedge'],
+  ['lw', 'Lob Wedge', 'LW', 60, 73, 1.15, 33, 10000, 0.64, 0.9, 0.1, 'wedge'],
 ]
 
-export const clubById = (id: string) => CLUBS.find((c) => c.id === id) ?? CLUBS[3]
+export const CLUBS: Club[] = [
+  ...ROWS.map(([id, name, short, loft, spd, smash, launch, spin, faceWeight, tiltGain, gear, sound]) => ({
+    id,
+    name,
+    short,
+    loft,
+    maxSpeed: mph(spd),
+    smash,
+    launch,
+    spin,
+    faceWeight,
+    tiltGain,
+    gear,
+    wood: sound === 'driver' || sound === 'wood',
+    sound,
+  })),
+  // A full putting stroke rolls it ~20 m on a medium-fast green.
+  { id: 'pt', name: 'Putter', short: 'PT', loft: 3, maxSpeed: 3.6, smash: 1.55, launch: 2, spin: 150, faceWeight: 0.95, tiltGain: 0, gear: 0, wood: false, putter: true, sound: 'putter' },
+]
+
+export const clubById = (id: string) => CLUBS.find((c) => c.id === id) ?? CLUBS[7]

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { simulate, type Env } from '../src/physics/flight'
 import { analyzeSwing } from '../src/swing/analyze'
 import { computeLaunch } from '../src/physics/impact'
-import { CLUBS } from '../src/physics/clubs'
+import { CLUBS, clubById } from '../src/physics/clubs'
+
+const I = (id: string) => CLUBS.findIndex((c) => c.id === id)
 import { LIES } from '../src/physics/lies'
 import { gesture, pureLaunch } from './helpers'
 
@@ -18,33 +20,52 @@ void fixedRng
 
 describe('ball flight behaviour', () => {
   it('positive spin-axis tilt curves the ball right, negative left', () => {
-    const fade = simulate(pureLaunch(3, { tiltDeg: 15 }), start, 0, calm)
-    const draw = simulate(pureLaunch(3, { tiltDeg: -15 }), start, 0, calm)
+    const fade = simulate(pureLaunch(I('7i'), { tiltDeg: 15 }), start, 0, calm)
+    const draw = simulate(pureLaunch(I('7i'), { tiltDeg: -15 }), start, 0, calm)
     expect(fade.carryOffline).toBeGreaterThan(8)
     expect(draw.carryOffline).toBeLessThan(-8)
   })
 
   it('headwind shortens and helpwind lengthens a 7 iron', () => {
-    const base = simulate(pureLaunch(3), start, 0, calm).carry
-    const into = simulate(pureLaunch(3), start, 0, { ...calm, wind: { speed: 7, dir: Math.PI, gust: 0, phase: 0 } }).carry
-    const down = simulate(pureLaunch(3), start, 0, { ...calm, wind: { speed: 7, dir: 0, gust: 0, phase: 0 } }).carry
+    const base = simulate(pureLaunch(I('7i')), start, 0, calm).carry
+    const into = simulate(pureLaunch(I('7i')), start, 0, { ...calm, wind: { speed: 7, dir: Math.PI, gust: 0, phase: 0 } }).carry
+    const down = simulate(pureLaunch(I('7i')), start, 0, { ...calm, wind: { speed: 7, dir: 0, gust: 0, phase: 0 } }).carry
     expect(into).toBeLessThan(base - 12)
     expect(down).toBeGreaterThan(base + 6)
   })
 
   it('a crosswind moves a high wedge more than a low punch', () => {
     const cross = { ...calm, wind: { speed: 8, dir: Math.PI / 2, gust: 0, phase: 0 } }
-    const high = simulate(pureLaunch(6), start, 0, cross)
-    const low = simulate(pureLaunch(6, { launchV: 14, spinRpm: 6000 }), start, 0, cross)
+    const high = simulate(pureLaunch(I('sw')), start, 0, cross)
+    const low = simulate(pureLaunch(I('sw'), { launchV: 14, spinRpm: 6000 }), start, 0, cross)
     expect(high.carryOffline / high.carry).toBeGreaterThan(low.carryOffline / low.carry)
   })
 
   it('wedges stop quickly on a green; driver releases on a firm fairway', () => {
-    const green = simulate(pureLaunch(5), start, 0, { ...calm, surfaceAt: () => 'green' })
+    const green = simulate(pureLaunch(I('pw')), start, 0, { ...calm, surfaceAt: () => 'green' })
     expect(green.total - green.carry).toBeLessThan(6)
-    const firm = simulate(pureLaunch(0), start, 0, { ...calm, firmness: 0.9 })
-    const soft = simulate(pureLaunch(0), start, 0, { ...calm, firmness: 0.1 })
+    const firm = simulate(pureLaunch(I('dr')), start, 0, { ...calm, firmness: 0.9 })
+    const soft = simulate(pureLaunch(I('dr')), start, 0, { ...calm, firmness: 0.1 })
     expect(firm.total - firm.carry).toBeGreaterThan(soft.total - soft.carry + 5)
+  })
+})
+
+describe('putting and hazards', () => {
+  it('a full putting stroke rolls 15-25 m on a green and a half stroke about a quarter of that', () => {
+    const pt = CLUBS.findIndex((c) => c.putter)
+    const green = { ...calm, surfaceAt: () => 'green' as const }
+    const full = simulate(pureLaunch(pt), { x: 0, y: 0.021, z: 0 }, 0, green)
+    const half = simulate(pureLaunch(pt, { ballSpeed: CLUBS[pt].maxSpeed * CLUBS[pt].smash * 0.5 }), { x: 0, y: 0.021, z: 0 }, 0, green)
+    expect(full.total).toBeGreaterThan(15)
+    expect(full.total).toBeLessThan(25)
+    expect(full.apex).toBeLessThan(0.05)
+    expect(half.total / full.total).toBeLessThan(0.4)
+  })
+
+  it('a ball landing in water stays there', () => {
+    const r = simulate(pureLaunch(I('7i')), start, 0, { ...calm, surfaceAt: (_x, z) => (z < -120 ? 'water' : 'fairway') })
+    expect(r.restSurface).toBe('water')
+    expect(r.total - r.carry).toBeLessThan(0.5)
   })
 })
 
@@ -63,7 +84,7 @@ describe('swing analysis', () => {
   it('an in-to-out gesture starts the ball right and draws it back', () => {
     const m = analyzeSwing(gesture({ unit: U, pathDeg: 12 }), U)!
     expect(m.pathAngle).toBeGreaterThan(10)
-    const l = computeLaunch(m, CLUBS[3], LIES.fairway, m.speed, zeroRng)
+    const l = computeLaunch(m, clubById('7i'), LIES.fairway, m.speed, zeroRng)
     expect(l.path).toBeGreaterThan(3)
     expect(l.launchH).toBeGreaterThan(1.5)
     expect(l.tiltDeg).toBeLessThan(-2)
@@ -71,7 +92,7 @@ describe('swing analysis', () => {
 
   it('an out-to-in gesture starts left and fades', () => {
     const m = analyzeSwing(gesture({ unit: U, pathDeg: -14 }), U)!
-    const l = computeLaunch(m, CLUBS[0], LIES.tee, m.speed, zeroRng)
+    const l = computeLaunch(m, clubById('dr'), LIES.tee, m.speed, zeroRng)
     expect(l.launchH).toBeLessThan(-1.5)
     expect(l.tiltDeg).toBeGreaterThan(4)
     const r = simulate(l, start, 0, calm)
@@ -81,28 +102,28 @@ describe('swing analysis', () => {
   it('quitting at the ball (no follow-through) releases early and hits it fat', () => {
     const m = analyzeSwing(gesture({ unit: U, follow: 0.15 }), U)!
     expect(m.releaseOffset).toBeGreaterThan(0.2)
-    const l = computeLaunch(m, CLUBS[3], LIES.fairway, m.speed, zeroRng)
+    const l = computeLaunch(m, clubById('7i'), LIES.fairway, m.speed, zeroRng)
     expect(['fat', 'chunk']).toContain(l.contact)
   })
 
   it('a tiny backswing thrown into a huge follow-through catches it thin', () => {
     const m = analyzeSwing(gesture({ unit: U, depth: 0.5, follow: 1.8, backMs: 400, downMs: 140 }), U)!
     expect(m.releaseOffset).toBeLessThan(-0.2)
-    const l = computeLaunch(m, CLUBS[3], LIES.fairway, m.speed, zeroRng)
+    const l = computeLaunch(m, clubById('7i'), LIES.fairway, m.speed, zeroRng)
     expect(['thin', 'top']).toContain(l.contact)
   })
 
   it('snatching from the top costs composure', () => {
     const smooth = analyzeSwing(gesture({ unit: U }), U)!
     const snatch = analyzeSwing(gesture({ unit: U, backMs: 1300, downMs: 110 }), U)!
-    const a = computeLaunch(smooth, CLUBS[3], LIES.fairway, smooth.speed, zeroRng)
-    const b = computeLaunch(snatch, CLUBS[3], LIES.fairway, snatch.speed, zeroRng)
+    const a = computeLaunch(smooth, clubById('7i'), LIES.fairway, smooth.speed, zeroRng)
+    const b = computeLaunch(snatch, clubById('7i'), LIES.fairway, snatch.speed, zeroRng)
     expect(b.chaos).toBeGreaterThan(a.chaos + 0.3)
   })
 
   it('missing the ball toward the heel shanks it', () => {
     const m = analyzeSwing(gesture({ unit: U, crossX: -0.45 }), U)!
-    const l = computeLaunch(m, CLUBS[3], LIES.fairway, m.speed, zeroRng)
+    const l = computeLaunch(m, clubById('7i'), LIES.fairway, m.speed, zeroRng)
     expect(l.contact).toBe('shank')
     expect(l.launchH).toBeGreaterThan(20)
   })

@@ -1,7 +1,7 @@
 // How the ball is sitting changes what the club can do to it.
 // These describe contact at impact; `surfaces` below describe landing/roll.
 
-export type LieId = 'tee' | 'fairway' | 'rough' | 'sand' | 'hardpan'
+export type LieId = 'tee' | 'fairway' | 'rough' | 'sand' | 'hardpan' | 'green'
 
 export interface Lie {
   id: LieId
@@ -24,10 +24,11 @@ export const LIES: Record<LieId, Lie> = {
   fairway: { id: 'fairway', name: 'Fairway', speedMul: 1, spinMul: 1, spinJitter: 0.03, launchAdd: 0, fatGrace: 2, fatPenalty: 1, thinPenalty: 1, ballSink: 0.05, turf: 'grass' },
   rough: { id: 'rough', name: 'Rough', speedMul: 0.88, spinMul: 0.55, spinJitter: 0.25, launchAdd: 1.5, fatGrace: 1, fatPenalty: 1.5, thinPenalty: 0.7, ballSink: 0.55, turf: 'rough' },
   sand: { id: 'sand', name: 'Fairway Bunker', speedMul: 0.96, spinMul: 0.8, spinJitter: 0.1, launchAdd: 0, fatGrace: 0, fatPenalty: 2.2, thinPenalty: 0.6, ballSink: 0.3, turf: 'sand' },
+  green: { id: 'green', name: 'Green', speedMul: 1, spinMul: 1, spinJitter: 0.02, launchAdd: 0, fatGrace: 3, fatPenalty: 1, thinPenalty: 1, ballSink: 0, turf: 'grass' },
   hardpan: { id: 'hardpan', name: 'Hardpan', speedMul: 1, spinMul: 1.08, spinJitter: 0.05, launchAdd: -1, fatGrace: 0, fatPenalty: 2.6, thinPenalty: 0.8, ballSink: 0, turf: 'dirt' },
 }
 
-export type SurfaceId = 'fairway' | 'rough' | 'green' | 'sand' | 'fringe'
+export type SurfaceId = 'fairway' | 'rough' | 'green' | 'sand' | 'fringe' | 'water'
 
 export interface Surface {
   id: SurfaceId
@@ -43,13 +44,14 @@ export const SURFACES: Record<SurfaceId, Surface> = {
   fringe: { id: 'fringe', restitution: 0.32, friction: 0.52, rollDecel: 1.4, rollDrag: 0.3, turfLoss: 0.4 },
   green: { id: 'green', restitution: 0.28, friction: 0.75, rollDecel: 0.52, rollDrag: 0.08, turfLoss: 0.5 },
   rough: { id: 'rough', restitution: 0.16, friction: 0.7, rollDecel: 4, rollDrag: 0.9, turfLoss: 0.6 },
+  water: { id: 'water', restitution: 0, friction: 1, rollDecel: 100, rollDrag: 10, turfLoss: 1 },
   sand: { id: 'sand', restitution: 0.03, friction: 0.95, rollDecel: 12, rollDrag: 2, turfLoss: 0.9 },
 }
 
 // Green/fairway firmness 0 (soft, receptive) .. 1 (baked). Firm ground gives
 // more bounce and less grab, so the ball releases.
 export function firmSurface(s: Surface, firmness: number): Surface {
-  if (s.id === 'sand' || s.id === 'rough') return s
+  if (s.id === 'sand' || s.id === 'rough' || s.id === 'water') return s
   const f = firmness - 0.5
   return {
     ...s,

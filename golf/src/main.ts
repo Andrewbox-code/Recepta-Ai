@@ -1,5 +1,7 @@
 import * as THREE from 'three'
-import { CLUBS, type Club } from './physics/clubs'
+import { CLUBS, clubById, type Club } from './physics/clubs'
+import { Grass } from './world/Grass'
+import { PRACTICE } from './world/layout'
 import { LIES, type Lie, type LieId } from './physics/lies'
 import { computeLaunch, type Launch } from './physics/impact'
 import { simulate, windAt, type ShotResult, type Wind, type FlightPoint } from './physics/flight'
@@ -17,7 +19,28 @@ type State = 'address' | 'flight' | 'rest'
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const yd = (m: number) => m / YD
 const mph = (ms: number) => ms / 0.44704
-const CLUB_COLORS: Record<string, number> = { dr: 0xff5d5d, '3w': 0xff9f43, '5i': 0xffe066, '7i': 0x7ee081, '9i': 0x4dd0e1, pw: 0x7aa2ff, sw: 0xd08bff }
+const CLUB_COLORS: Record<string, number> = Object.fromEntries(CLUBS.map((c, i) => [c.id, new THREE.Color().setHSL((i / CLUBS.length) * 0.85, 0.75, 0.6).getHex()]))
+
+// Stock pure-strike carry (yards) in calm air, for the club selector.
+function stockDistance(c: Club) {
+  const l: Launch = {
+    clubSpeed: c.maxSpeed,
+    ballSpeed: c.maxSpeed * c.smash,
+    launchV: c.launch,
+    launchH: 0,
+    spinRpm: c.spin,
+    tiltDeg: 0,
+    path: 0,
+    face: 0,
+    depthMm: 0,
+    toeMm: 0,
+    swingPct: 1,
+    chaos: 0,
+    contact: 'pure',
+    quality: 1,
+  }
+  return yd(simulate(l, { x: 0, y: 0.03, z: 0 }, 0, { wind: { speed: 0, dir: 0, gust: 0, phase: 0 }, firmness: 0.5, surfaceAt: () => 'fairway' }, 1 / 120).carry)
+}
 
 const store = {
   get<T>(k: string, d: T): T {
@@ -64,7 +87,7 @@ class Game {
   overlay: SwingOverlay
   aimLine: THREE.Mesh
 
-  club: Club = CLUBS[3]
+  club: Club = clubById('7i')
   lie: Lie = LIES.fairway
   aim = 0
   wind: Wind = { speed: 0, dir: 0, gust: 0.5, phase: Math.random() * 10 }
@@ -81,20 +104,33 @@ class Game {
   swung = false
   tee = new THREE.Vector3(0, 0, 0)
   history: { club: string; carry: number; total: number; off: number }[] = []
+  quality: 'high' | 'low' = store.get('quality', matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) < 500 ? 'low' : 'high')
+  grass: Grass[] = []
+  stock: Record<string, number> = {}
+  freshPutt = false
+  baseAim = 0 // straight down the range, or at the cup when putting
 
   constructor() {
     const canvas = $<HTMLCanvasElement>('gl')
+    const high = this.quality === 'high'
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
+    this.renderer.setPixelRatio(high ? Math.min(2, window.devicePixelRatio) : 1)
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.05
+    this.renderer.toneMappingExposure = 0.5
+    this.renderer.shadowMap.enabled = high
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
 
     this.cam = new CameraDirector(window.innerWidth / window.innerHeight)
     this.cam.style = store.get<CamStyle>('cam', 'chase')
-    this.range = new Range(this.scene)
-    this.ball = new Ball(this.scene)
+    this.range = new Range(this.scene, this.renderer, high)
+    this.ball = new Ball(this.scene, high)
+    if (high) {
+      this.grass.push(new Grass(this.scene, new THREE.Vector2(0, -4), 26, high))
+      this.grass.push(new Grass(this.scene, new THREE.Vector2(PRACTICE.x, PRACTICE.z), 13, high))
+    }
+    this.stock = Object.fromEntries(CLUBS.map((c) => [c.id, stockDistance(c)]))
     this.debris = new Debris(this.scene)
     this.tracer = new Tracer(this.scene)
     this.marks = new GroundMarks(this.scene)
@@ -132,6 +168,19 @@ class Game {
     this.reset(true)
     window.addEventListener('resize', () => this.resize())
     window.addEventListener('keydown', (e) => this.key(e))
+    let wheelAcc = 0
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault()
+        wheelAcc += e.deltaY
+        if (Math.abs(wheelAcc) > 60) {
+          this.cycleClub(Math.sign(wheelAcc))
+          wheelAcc = 0
+        }
+      },
+      { passive: false },
+    )
     let last = performance.now()
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
@@ -145,6 +194,12 @@ class Game {
   // ---------- shot lifecycle ----------
 
   reset(snap = false) {
+    if (this.freshPutt && this.club.putter) {
+      this.freshPutt = false
+      this.state = 'address'
+      this.newPutt()
+      return
+    }
     this.state = 'address'
     this.shot = null
     this.timeScale = 1
@@ -153,7 +208,7 @@ class Game {
     this.ball.place(p)
     this.ball.setLie(this.lie, this.tee)
     this.ball.mesh.rotation.set(0, Math.random() * 6, 0)
-    this.cam.address(p, this.aim, snap)
+    this.cam.address(p, this.aim, snap, !!this.club.putter)
     this.input.enabled = true
     this.aimLine.visible = true
     this.tracer.opacity = 0.35
@@ -178,6 +233,7 @@ class Game {
       wind: this.wind,
       firmness: this.firmness,
       surfaceAt: this.range.surfaceAt,
+      groundY: this.range.groundY,
       t0: this.worldT,
     })
     const holed = this.checkHoled(result)
@@ -187,15 +243,15 @@ class Game {
     this.tracer.reset()
     this.tracer.opacity = 1
     this.tracer.color = launch.contact === 'pure' ? 0xfff27a : 0xffffff
-    this.cam.launch(new THREE.Vector3(result.carryPos.x, result.carryPos.y, result.carryPos.z))
+    this.cam.launch(new THREE.Vector3(result.carryPos.x, result.carryPos.y, result.carryPos.z), !!this.club.putter)
     this.impactFx(launch, start)
     this.fillLab(m, launch)
     this.showLaunch(launch)
 
     // Slow motion for the shots you'll remember, good or bad.
-    const great = launch.contact === 'pure' && launch.swingPct > 0.85 && launch.quality > 0.9
+    const great = !this.club.putter && launch.contact === 'pure' && launch.swingPct > 0.85 && launch.quality > 0.9
     const awful = ['shank', 'chunk', 'top', 'whiff', 'skied'].includes(launch.contact)
-    if (great || awful) {
+    if ((great || awful) && !this.club.putter) {
       this.slowMo = great ? 0.9 : 0.7
       this.timeScale = 0.2
     }
@@ -345,7 +401,10 @@ class Game {
       const b = r.bounces[s.bounce]
       const bp = new THREE.Vector3(b.p.x, 0.01, b.p.z)
       this.audio.land(b.surface, b.speed)
-      if (b.surface === 'sand') this.debris.spray(bp, new THREE.Vector3(0, 1, 0), { count: 25, colors: [0xe3d3a4, 0xd8c692], speed: 0, spread: 2, up: 2, size: 0.02, drag: 3 })
+      if (b.surface === 'water') {
+        this.debris.spray(new THREE.Vector3(b.p.x, b.p.y, b.p.z), new THREE.Vector3(0, 1, 0), { count: 90, colors: [0xffffff, 0xdbe9f2, 0xb8d3e3], speed: 0, spread: 3, up: 5, size: 0.03, drag: 1.2 })
+        this.audio.splash()
+      } else if (b.surface === 'sand') this.debris.spray(bp, new THREE.Vector3(0, 1, 0), { count: 25, colors: [0xe3d3a4, 0xd8c692], speed: 0, spread: 2, up: 2, size: 0.02, drag: 3 })
       else if (b.speed > 8) this.debris.spray(bp, new THREE.Vector3(0, 1, 0), { count: 6, colors: [0x4f8c31, 0x6b4a2b], speed: 0, spread: 1, up: 1.2, size: 0.015 })
       if (!s.landed) {
         s.landed = true
@@ -389,11 +448,22 @@ class Game {
     }
 
     // The gallery reacts to proximity, not to a grade.
+    if (r.restSurface === 'water') {
+      this.toast('Wet one')
+      this.audio.crowd(0.6, 'groan')
+      return
+    }
     if (s.holed) {
-      this.audio.crowd(1.3, 'cheer')
+      this.audio.cup()
+      this.audio.crowd(s.club.putter && Math.hypot(this.tee.x - rest.x, this.tee.z - rest.z) < 3 ? 0.4 : 1.3, 'cheer')
+      if (s.club.putter) {
+        this.restTimer = 2.5
+        this.freshPutt = true
+      }
       this.toast('In the hole!')
       return
     }
+    if (s.club.putter) return
     let best = Infinity
     for (const f of this.range.flags) best = Math.min(best, Math.hypot(rest.x - f.pos.x, rest.z - f.pos.z))
     if (best < 1.5) this.audio.crowd(1, 'cheer')
@@ -419,10 +489,54 @@ class Game {
   }
 
   setClub(c: Club) {
+    if (this.state !== 'address') return
+    const wasPutter = this.club.putter
     this.club = c
     document.querySelectorAll<HTMLButtonElement>('#clubs button').forEach((b) => b.classList.toggle('on', b.dataset.club === c.id))
-    if (c.wood && this.lie.id === 'fairway' && c.id === 'dr') this.setLie(LIES.tee)
-    else if (!c.wood && this.lie.id === 'tee') this.setLie(LIES.fairway)
+    $('clubName').textContent = c.name
+    $('clubMeta').textContent = c.putter ? 'Practice green' : `${c.loft}° · ${Math.round(this.stock[c.id] ?? 0)} yd carry`
+    document.querySelector('#clubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+    $('lies').classList.toggle('hidden', !!c.putter)
+    if (c.putter) {
+      this.newPutt()
+      return
+    }
+    if (wasPutter) {
+      this.tee.set(0, 0, 0)
+      this.baseAim = 0
+      this.aim = 0
+      this.lie = LIES.fairway
+      this.nudgeAim(0)
+    }
+    if (c.id === 'dr' && this.lie.id === 'fairway') this.setLie(LIES.tee, !wasPutter)
+    else if (!c.wood && this.lie.id === 'tee') this.setLie(LIES.fairway, !wasPutter)
+    else this.setLie(this.lie, false)
+    if (wasPutter) this.cam.address(this.ball.mesh.position, this.aim, true)
+  }
+
+  cycleClub(dir: number) {
+    const i = CLUBS.indexOf(this.club)
+    this.setClub(CLUBS[(i + dir + CLUBS.length) % CLUBS.length])
+  }
+
+  // Drop a ball somewhere on the practice green, 3-14 m from the cup.
+  newPutt() {
+    const a = Math.random() * Math.PI * 2
+    const r = 3 + Math.random() * 11
+    let x = PRACTICE.cup.x + Math.cos(a) * r
+    let z = PRACTICE.cup.z + Math.sin(a) * r
+    const d = Math.hypot(x - PRACTICE.x, z - PRACTICE.z)
+    if (d > PRACTICE.r - 0.8) {
+      x = PRACTICE.x + ((x - PRACTICE.x) / d) * (PRACTICE.r - 0.8)
+      z = PRACTICE.z + ((z - PRACTICE.z) / d) * (PRACTICE.r - 0.8)
+    }
+    this.tee.set(x, 0, z)
+    this.baseAim = Math.atan2(PRACTICE.cup.x - x, -(PRACTICE.cup.z - z))
+    this.aim = this.baseAim
+    this.lie = LIES.green
+    $('clubMeta').textContent = `Practice green · ${Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z).toFixed(1)} m to the cup`
+    this.reset(true)
+    this.nudgeAim(0)
   }
 
   setLie(l: Lie, look = true) {
@@ -442,7 +556,16 @@ class Game {
   // ---------- HUD ----------
 
   buildHud() {
-    $('clubs').innerHTML = CLUBS.map((c, i) => `<button data-club="${c.id}" title="${c.name} (${i + 1})">${c.short}</button>`).join('')
+    $('clubs').innerHTML = CLUBS.map((c) => `<button data-club="${c.id}" title="${c.name}">${c.short}</button>`).join('')
+    $('clubPrev').addEventListener('click', () => this.cycleClub(-1))
+    $('clubNext').addEventListener('click', () => this.cycleClub(1))
+    document.querySelectorAll<HTMLButtonElement>('[data-quality]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.quality === this.quality)
+      b.addEventListener('click', () => {
+        store.set('quality', b.dataset.quality)
+        location.reload()
+      })
+    })
     $('clubs').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).dataset.club
       if (id) this.setClub(CLUBS.find((c) => c.id === id)!)
@@ -523,9 +646,10 @@ class Game {
 
   nudgeAim(dir: number) {
     if (this.state !== 'address') return
-    this.aim = Math.max(-0.35, Math.min(0.35, this.aim + (dir * Math.PI) / 180))
-    this.cam.address(this.ball.mesh.position, this.aim)
-    const d = Math.round((this.aim * 180) / Math.PI)
+    const step = (dir * Math.PI) / 180 / (this.club.putter ? 4 : 1)
+    this.aim = this.baseAim + Math.max(-0.35, Math.min(0.35, this.aim - this.baseAim + step))
+    this.cam.address(this.ball.mesh.position, this.aim, false, !!this.club.putter)
+    const d = Math.round(((this.aim - this.baseAim) * 180) / Math.PI * (this.club.putter ? 4 : 1)) / (this.club.putter ? 4 : 1)
     $('aimText').textContent = d === 0 ? 'Aim 0°' : `Aim ${Math.abs(d)}° ${d > 0 ? 'R' : 'L'}`
   }
 
@@ -589,7 +713,7 @@ class Game {
   key(e: KeyboardEvent) {
     if ((e.target as HTMLElement).tagName === 'INPUT') return
     const n = parseInt(e.key)
-    if (n >= 1 && n <= CLUBS.length) this.setClub(CLUBS[n - 1])
+    if (n >= 0 && n <= 9) this.setClub(CLUBS[n === 0 ? 9 : n - 1])
     switch (e.key.toLowerCase()) {
       case 'q':
       case 'arrowleft':
@@ -598,6 +722,17 @@ class Game {
       case 'e':
       case 'arrowright':
         this.nudgeAim(1)
+        break
+      case '[':
+      case 'z':
+        this.cycleClub(-1)
+        break
+      case ']':
+      case 'x':
+        this.cycleClub(1)
+        break
+      case 'n':
+        if (this.club.putter && this.state === 'address') this.newPutt()
         break
       case 'l':
         this.toggleLab()
@@ -647,7 +782,7 @@ class Game {
     }
     if (this.lieTimer > 0) {
       this.lieTimer -= dt
-      if (this.lieTimer <= 0 && this.state === 'address') this.cam.address(this.ball.mesh.position, this.aim)
+      if (this.lieTimer <= 0 && this.state === 'address') this.cam.address(this.ball.mesh.position, this.aim, false, !!this.club.putter)
     }
 
     const vel = this.shot ? this.sample(this.shot.result.points, this.shot, this.shot.t).v : new THREE.Vector3()
@@ -656,6 +791,11 @@ class Game {
     this.debris.update(sdt)
     this.tracer.update(this.cam.camera)
     this.range.update(this.worldT, this.wind)
+    const gw = windAt(this.wind, 1, this.worldT)
+    for (const g of this.grass) g.update(this.worldT, gw)
+    const focus = this.state === 'address' ? this.tee : this.ball.mesh.position
+    this.range.atmosphere.follow(focus)
+    this.range.atmosphere.update(this.worldT, new THREE.Vector2(gw.x, gw.z), this.cam.camera)
     this.drift.center.copy(this.cam.camera.position).addScaledVector(this.cam.camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), 20)
     this.drift.update(sdt, this.worldT, this.wind)
     this.aimLine.position.set(this.tee.x, 0.015, this.tee.z)

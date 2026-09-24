@@ -9,16 +9,24 @@ const yd = (m: number) => m / 0.9144
 // Reference carries (yards) for a ~108 mph driver-speed player.
 const EXPECTED: Record<string, [number, number]> = {
   dr: [255, 285],
-  '3w': [230, 260],
-  '5i': [185, 210],
-  '7i': [160, 182],
+  '3w': [235, 260],
+  '5w': [222, 245],
+  '3h': [212, 235],
+  '4i': [200, 222],
+  '5i': [190, 212],
+  '6i': [178, 198],
+  '7i': [164, 184],
+  '8i': [150, 170],
   '9i': [135, 155],
   pw: [120, 140],
-  sw: [88, 110],
+  gw: [108, 126],
+  sw: [92, 112],
+  lw: [78, 98],
 }
 
 describe('flight calibration (calm air, pure strike)', () => {
   CLUBS.forEach((c, i) => {
+    if (c.putter) return
     it(`${c.name} carries in the expected window`, () => {
       const r = simulate(pureLaunch(i), { x: 0, y: 0.03, z: 0 }, 0, calm)
       console.log(

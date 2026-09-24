@@ -4,12 +4,13 @@ import type { Lie } from '../physics/lies'
 
 const TEE_HEIGHT = 0.03 // ball bottom above ground on a driver tee
 
-function radialTex(inner: string, outer: string) {
+function radialTex(inner: string, outer: string, hold = 0) {
   const c = document.createElement('canvas')
   c.width = c.height = 64
   const g = c.getContext('2d')!
   const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32)
   gr.addColorStop(0, inner)
+  if (hold) gr.addColorStop(hold, inner)
   gr.addColorStop(1, outer)
   g.fillStyle = gr
   g.fillRect(0, 0, 64, 64)
@@ -26,27 +27,62 @@ export class Ball {
   private lie!: Lie
   private spinAxis = new THREE.Vector3(1, 0, 0)
   private spinRate = 0
+  private useBlob: boolean
 
-  constructor(scene: THREE.Scene) {
-    const tex = (() => {
+  constructor(scene: THREE.Scene, shadows: boolean) {
+    this.useBlob = !shadows
+    // Dimples as a normal map: a hex grid of shallow cups.
+    const normal = (() => {
+      const n = 256
       const c = document.createElement('canvas')
-      c.width = c.height = 128
+      c.width = c.height = n
       const g = c.getContext('2d')!
-      g.fillStyle = '#fafafa'
-      g.fillRect(0, 0, 128, 128)
-      g.fillStyle = 'rgba(0,0,0,0.06)'
-      for (let y = 4; y < 128; y += 8) {
-        for (let x = (y / 8) % 2 ? 0 : 4; x < 128; x += 8) {
-          g.beginPath()
-          g.arc(x, y, 2.4, 0, 7)
-          g.fill()
+      const img = g.createImageData(n, n)
+      const cell = 16
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          const row = Math.floor(y / (cell * 0.866))
+          const ox = row % 2 ? cell / 2 : 0
+          const cx = Math.round((x - ox) / cell) * cell + ox
+          const cy = (Math.round(y / (cell * 0.866)) * cell * 0.866)
+          let dx = (x - cx) / (cell * 0.45)
+          let dy = (y - cy) / (cell * 0.45)
+          const r = Math.hypot(dx, dy)
+          if (r > 1) dx = dy = 0
+          const i = (y * n + x) * 4
+          img.data[i] = 128 - dx * 70
+          img.data[i + 1] = 128 - dy * 70
+          img.data[i + 2] = 255
+          img.data[i + 3] = 255
         }
       }
-      g.fillStyle = '#222'
-      g.fillRect(40, 60, 48, 8) // a logo line so you can see it spin
-      return new THREE.CanvasTexture(c)
+      g.putImageData(img, 0, 0)
+      const t = new THREE.CanvasTexture(c)
+      t.wrapS = t.wrapT = THREE.RepeatWrapping
+      t.repeat.set(2, 1)
+      return t
     })()
-    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BALL.radius, 24, 16), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35, metalness: 0, emissive: 0xffffff, emissiveIntensity: 0.25 }))
+    const tex = (() => {
+      const c = document.createElement('canvas')
+      c.width = 256
+      c.height = 128
+      const g = c.getContext('2d')!
+      g.fillStyle = '#f7f7f5'
+      g.fillRect(0, 0, 256, 128)
+      g.fillStyle = '#1b1b1b'
+      g.font = 'bold 18px system-ui, sans-serif'
+      g.fillText('PURE', 100, 70) // a logo so you can see it spin
+      g.fillStyle = '#d4252b'
+      g.fillRect(96, 76, 52, 3)
+      const t = new THREE.CanvasTexture(c)
+      t.colorSpace = THREE.SRGBColorSpace
+      return t
+    })()
+    this.mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(BALL.radius, 48, 32),
+      new THREE.MeshPhysicalMaterial({ map: tex, normalMap: normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.45, clearcoat: 1, clearcoatRoughness: 0.12, emissive: 0xffffff, emissiveIntensity: 0.06 }),
+    )
+    this.mesh.castShadow = shadows
     scene.add(this.mesh)
 
     this.shadow = new THREE.Mesh(
@@ -56,7 +92,7 @@ export class Ball {
     this.shadow.rotation.x = -Math.PI / 2
     scene.add(this.shadow)
 
-    this.tee = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0025, 0.055, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }))
+    this.tee = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0022, 0.055, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }))
     scene.add(this.patch)
     scene.add(this.tee)
   }
@@ -71,8 +107,14 @@ export class Ball {
     this.lie = lie
     this.patch.clear()
     this.patch.position.set(at.x, 0, at.z)
+    // Soft-edged decals so the lie blends into the painted terrain.
+    const fade = radialTex('#ffffff', '#000000', 0.55)
     const disc = (r: number, color: number, y = 0.012, tex?: THREE.Texture) => {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(r, 40), new THREE.MeshLambertMaterial({ color, map: tex ?? null }))
+      const m = new THREE.Mesh(
+        new THREE.CircleGeometry(r, 40),
+        new THREE.MeshStandardMaterial({ color, map: tex ?? null, alphaMap: fade, transparent: true, depthWrite: false, roughness: 0.95 }),
+      )
+      m.receiveShadow = true
       m.rotation.x = -Math.PI / 2
       m.position.y = y
       this.patch.add(m)
@@ -87,7 +129,7 @@ export class Ball {
         const n = 900
         const blade = new THREE.ConeGeometry(0.0035, 1, 3)
         blade.translate(0, 0.5, 0)
-        const im = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ color: 0xffffff }), n)
+        const im = new THREE.InstancedMesh(blade, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), n)
         const d = new THREE.Object3D()
         const c = new THREE.Color()
         for (let i = 0; i < n; i++) {
@@ -155,6 +197,7 @@ export class Ball {
   }
 
   update(dt: number, camera: THREE.PerspectiveCamera, viewH: number, groundY = 0) {
+    this.mesh.castShadow = this.mesh.scale.x < 3
     // Cosmetic spin, capped so it reads as spin instead of strobing.
     this.mesh.rotateOnWorldAxis(this.spinAxis, Math.min(this.spinRate, 60) * dt)
     // Keep the ball visible at distance, like every broadcast tracer does.
@@ -168,6 +211,6 @@ export class Ball {
     this.shadow.scale.set(s, s, 1)
     this.shadow.position.set(this.mesh.position.x, groundY + 0.015, this.mesh.position.z)
     ;(this.shadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - h / 25)
-    this.shadow.visible = !this.lie || this.lie.ballSink < 0.4 || h > 0.1
+    this.shadow.visible = this.useBlob && (!this.lie || this.lie.ballSink < 0.4 || h > 0.1)
   }
 }

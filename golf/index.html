@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0f1a12" />
     <title>Pure Strike — Range</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -13,9 +16,20 @@
 
     <div id="hud">
       <div class="panel top-left">
-        <div class="brand">PURE STRIKE <span>range prototype</span></div>
-        <div class="row" id="clubs"></div>
-        <div class="row" id="lies"></div>
+        <div class="brand">PURE<b>STRIKE</b><span>Range</span></div>
+        <div class="row chips" id="lies"></div>
+      </div>
+
+      <div class="bag-wrap">
+        <div class="bag">
+          <button id="clubPrev" class="nav" aria-label="Previous club">‹</button>
+          <div class="club-card">
+            <div id="clubName">7 Iron</div>
+            <div id="clubMeta"></div>
+          </div>
+          <button id="clubNext" class="nav" aria-label="Next club">›</button>
+        </div>
+        <div class="bag-strip" id="clubs"></div>
       </div>
 
       <div class="panel top-right">
@@ -75,6 +89,10 @@
             <button data-wind="0">Calm</button><button data-wind="1">Light</button><button data-wind="2">Breezy</button><button data-wind="3">Strong</button>
           </div>
         </div>
+        <div class="field">Graphics
+          <div class="row"><button data-quality="high">High</button><button data-quality="low">Performance</button></div>
+          <small>High adds real-time shadows and grass. Changing it reloads the range.</small>
+        </div>
         <div class="field">Camera
           <div class="row"><button data-cam="chase">Ball chase</button><button data-cam="tracer">Down the line</button></div>
         </div>
@@ -83,7 +101,7 @@
           <button id="muteBtn">Sound on</button>
           <button id="clearBtn">Clear markers</button>
         </div>
-        <div class="keys">Keys: 1–7 club · Q/E aim · L lab · V camera · W new wind · M mute · Space skip</div>
+        <div class="keys">Keys: Z/X or [ ] or mouse wheel change club · 1–0 jump to club · Q/E aim · N new putt · L lab · V camera · W new wind · M mute · Space skip</div>
       </div>
 
       <div id="hint">Press &amp; hold anywhere, <b>pull down</b> to take it back, then <b>push up through the ball</b>.<br /><small>Smooth tempo beats raw speed. Swing through — don't stop at the ball.</small></div>

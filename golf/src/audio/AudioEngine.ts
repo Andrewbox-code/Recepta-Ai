@@ -138,6 +138,13 @@ export class AudioEngine {
     const wood = club.sound === 'driver' || club.sound === 'wood'
     const wedge = club.sound === 'wedge'
 
+    if (club.putter && contact !== 'whiff') {
+      // Soft insert "tock"; off-centre is duller and clickier.
+      const clean = contact === 'pure' || contact === 'good'
+      this.tone({ at: t, freq: clean ? 1250 : 800, dur: 0.05, gain: 0.25 * (0.4 + p), type: 'triangle' })
+      this.burst({ at: t, dur: 0.015, freq: clean ? 3500 : 2200, q: 2, gain: 0.3 * (0.4 + p) })
+      return
+    }
     if (contact === 'whiff') {
       this.burst({ at: t, dur: 0.35, freq: 900, freqEnd: 300, q: 0.8, gain: 0.25 })
       return
@@ -232,6 +239,22 @@ export class AudioEngine {
       default:
         this.burst({ at, dur: 0.16 * amount + 0.06, type: 'lowpass', freq: 1800, q: 0.7, gain: 0.5 * amount, attack: 0.004 })
     }
+  }
+
+  splash() {
+    if (!this.ctx) return
+    const t = this.ctx.currentTime
+    this.burst({ at: t, dur: 0.5, freq: 1200, freqEnd: 400, q: 0.6, gain: 0.55, attack: 0.005 })
+    this.tone({ at: t, freq: 220, freqEnd: 90, dur: 0.18, gain: 0.3 })
+    for (let i = 0; i < 6; i++) this.tone({ at: t + 0.1 + Math.random() * 0.4, freq: 900 + Math.random() * 900, freqEnd: 1800, dur: 0.05, gain: 0.05 })
+  }
+
+  // Ball rattling into the cup.
+  cup() {
+    if (!this.ctx) return
+    const t = this.ctx.currentTime
+    ;[0, 0.07, 0.12].forEach((d, i) => this.tone({ at: t + d, freq: 520 - i * 60, dur: 0.07, gain: 0.25 - i * 0.06, type: 'triangle' }))
+    this.tone({ at: t + 0.16, freq: 160, freqEnd: 90, dur: 0.12, gain: 0.3 })
   }
 
   land(surface: SurfaceId, speed: number) {

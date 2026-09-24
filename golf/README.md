@@ -2,9 +2,24 @@
 
 "Pure Strike" is a working title. The name only appears in `index.html`, the HUD brand line, and `package.json`.
 
-This is the first vertical slice: **swing input and ball physics on a flat driving range**. There's no course, career mode, or art pass yet. The aim is to get the swing feeling right first.
+This is the first vertical slice: **swing input and ball physics on a driving range**. There's no course or career mode yet. The aim is to get the swing feeling right first.
+
+**What's on the range:**
+- a full 15-club bag, from driver to putter
+- target greens guarded by bunkers
+- a pond in front of the 145
+- a practice putting green beside the tee
 
 - **Stack:** Three.js + TypeScript + Vite. No game engine and no loaded assets. All sound is synthesised with WebAudio and all textures are drawn to canvases, so the prototype stays small and quick to iterate on.
+- **Look:**
+  - a physically based sky with drifting clouds, which also lights the scene
+  - a sun that casts soft shadows
+  - sculpted terrain: raised greens, sunken bunkers with lips, mounds and distant hills
+  - dense instanced grass that bends in the wind
+  - leaf-card trees
+  - a reflective pond
+  - a clearcoat, dimpled ball
+- **Graphics setting:** Settings → Graphics switches between **High** and **Performance**. Performance turns off real-time shadows and the grass blades, and is the default on small touch screens.
 - **Runs:** in desktop browsers (mouse or trackpad) and on phones and tablets (touch).
 
 ```bash
@@ -50,7 +65,9 @@ There's no power bar and no timing meter. Everything comes from the motion itsel
 
 | Key | Action |
 |---|---|
-| `1`–`7` | Club (DR, 3W, 5i, 7i, 9i, PW, SW) |
+| `Z` / `X`, `[` / `]`, or mouse wheel | Previous / next club |
+| `1`–`0` | Jump to the first ten clubs (DR … 9i) |
+| `N` | New putt (putter only) |
 | `Q` / `E` or arrow keys | Aim left or right |
 | `L` | Swing Lab |
 | `V` | Camera style: low ball-chase or down-the-line |
@@ -64,6 +81,34 @@ Settings has:
 - **turf firmness**
 - **wind strength**
 - **camera style**
+
+## The bag
+
+| Club | Stock carry |
+|---|---|
+| DR | 264 yd |
+| 3W | 256 yd |
+| 5W | 244 yd |
+| 3H | 233 yd |
+| 4i | 219 yd |
+| 5i | 205 yd |
+| 6i | 191 yd |
+| 7i | 174 yd |
+| 8i | 157 yd |
+| 9i | 138 yd |
+| PW | 127 yd |
+| GW | 112 yd |
+| SW | 100 yd |
+| LW | 85 yd |
+
+These are pure strikes in calm air. The club selector shows each club's loft and stock carry.
+
+**Picking a club:** use the carousel at the bottom of the screen, the chip strip above it, the mouse wheel, or the keys.
+
+**Putting:** choosing the **Putter** moves you to the practice green. You get a random putt 3–14 m from the cup, and the aim starts pointed at the hole.
+- The same swing gesture works, but only speed control and start line matter.
+- Toe or heel contact comes up short.
+- Hole it and you get a new putt.
 
 ## Ball physics (`src/physics`)
 
@@ -84,7 +129,9 @@ The ball visibly sits differently in each lie. Changing lie triggers a close-up 
 - spin decay
 - **wind with a log height profile**, so a low punch really does cheat the wind and a high wedge gets pushed around
 
-**Landing.** Bounces use an impulse model with surface friction. Backspin fights forward speed at the contact patch, so wedges check up on greens while drivers release on a firm fairway. Surfaces (fairway, fringe, green, rough, sand) and the firmness setting change bounce, grab, and roll-out.
+**Landing.** Bounces use an impulse model with surface friction. Backspin fights forward speed at the contact patch, so wedges check up on greens while drivers release on a firm fairway. Surfaces (fairway, fringe, green, rough, sand, water) and the firmness setting change bounce, grab, and roll-out. A ball that lands or rolls into the pond is gone.
+
+**Course shape:** `src/world/layout.ts` defines the shape of the course (heights and surfaces). Both the renderer and the ball physics read it, so the ball lands on exactly what you see.
 
 **Calibration.** `test/tuning.test.ts` checks pure-strike carries against real launch-monitor windows for a player with about 108 mph driver speed:
 
@@ -130,7 +177,8 @@ src/physics/impact.ts     swing + club + lie -> launch conditions & contact type
 src/physics/flight.ts     flight / bounce / roll simulation, wind model
 src/physics/clubs.ts      club table
 src/physics/lies.ts       lies (contact) and surfaces (landing)
-src/world/*               range, ball + lie patches, debris, tracer, wind drift
+src/world/layout.ts       course shape: heights + surfaces, shared by renderer and physics
+src/world/*               terrain, sky, trees, grass, range dressing, ball + lie patches, debris, tracer, wind drift
 src/camera/*              camera director
 src/audio/*               synthesised audio
 src/ui/SwingOverlay.ts    on-screen hand path

@@ -1,34 +1,17 @@
 import * as THREE from 'three'
-import type { SurfaceId } from '../physics/lies'
 import { windAt, type Wind } from '../physics/flight'
+import { Atmosphere } from './Atmosphere'
+import { Terrain } from './Terrain'
+import { Trees } from './Trees'
+import { FAIRWAY_HALF, PRACTICE, TARGETS, YD, heightAt, surfaceAt, groundY, type Target } from './layout'
 
-export const YD = 0.9144
-
-interface Target {
-  yd: number
-  x: number
-  r: number
-  color: string
-  bunkers: { dx: number; dz: number; r: number }[]
-}
-
-export const TARGETS: Target[] = [
-  { yd: 60, x: -7, r: 8, color: '#ff4d4d', bunkers: [{ dx: 9, dz: 2, r: 3.2 }] },
-  { yd: 100, x: 11, r: 10, color: '#ffd23f', bunkers: [{ dx: -10, dz: 5, r: 4 }] },
-  { yd: 145, x: -13, r: 12, color: '#4dabff', bunkers: [{ dx: 0, dz: 13, r: 4.5 }, { dx: 13, dz: 2, r: 4 }] },
-  { yd: 185, x: 7, r: 14, color: '#ffffff', bunkers: [{ dx: -14, dz: 6, r: 5 }, { dx: 13, dz: -6, r: 4.5 }] },
-  { yd: 235, x: -6, r: 17, color: '#ff8c1a', bunkers: [{ dx: 16, dz: 12, r: 6 }] },
-  { yd: 285, x: 9, r: 20, color: '#b36bff', bunkers: [{ dx: -20, dz: 0, r: 6 }, { dx: 5, dz: 22, r: 5 }] },
-]
-
-const FAIRWAY_HALF = 38
-const RANGE_LEN = 360
+export { YD, TARGETS }
 
 export interface Flag {
   pos: THREE.Vector3
   cloth: THREE.Mesh
   base: Float32Array
-  target: Target
+  target: Target | null
 }
 
 function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
@@ -38,265 +21,162 @@ function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => 
   draw(c.getContext('2d')!)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 8
+  t.anisotropy = 4
   return t
-}
-
-function speckle(g: CanvasRenderingContext2D, w: number, h: number, n: number, colors: string[], size = 2) {
-  for (let i = 0; i < n; i++) {
-    g.fillStyle = colors[i % colors.length]
-    g.fillRect(Math.random() * w, Math.random() * h, size, size * (1 + Math.random() * 2))
-  }
 }
 
 export class Range {
   group = new THREE.Group()
   flags: Flag[] = []
-  private trees!: THREE.InstancedMesh
-  private trunks!: THREE.InstancedMesh
-  private treeData: { x: number; z: number; s: number; phase: number }[] = []
+  atmosphere: Atmosphere
+  terrain: Terrain
+  trees: Trees
   private sock!: THREE.Group
   private sockMesh!: THREE.Mesh
-  private dummy = new THREE.Object3D()
 
-  constructor(scene: THREE.Scene) {
+  surfaceAt = surfaceAt
+  groundY = groundY
+
+  constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, shadows: boolean) {
     scene.add(this.group)
-    this.buildSky(scene)
-    this.buildGround()
-    this.buildTargets()
-    this.buildTrees()
-    this.buildMarkers()
-    this.buildWindsock()
-  }
-
-  surfaceAt = (x: number, z: number): SurfaceId => {
+    this.atmosphere = new Atmosphere(scene, renderer, shadows)
+    this.terrain = new Terrain(scene, this.atmosphere.sunDir)
+    this.trees = new Trees(scene, shadows)
     for (const t of TARGETS) {
       const cz = -t.yd * YD
-      for (const b of t.bunkers) {
-        if (Math.hypot(x - (t.x + b.dx), z - (cz + b.dz)) < b.r) return 'sand'
-      }
-      const d = Math.hypot(x - t.x, z - cz)
-      if (d < t.r) return 'green'
-      if (d < t.r + 1.5) return 'fringe'
-    }
-    if (Math.abs(x) > FAIRWAY_HALF || z < -RANGE_LEN || z > 12) return 'rough'
-    return 'fairway'
-  }
-
-  private buildSky(scene: THREE.Scene) {
-    const geo = new THREE.SphereGeometry(1800, 32, 16)
-    const mat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      uniforms: {},
-      vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `varying vec3 vP;
-        void main(){
-          float h = max(vP.y, 0.0);
-          vec3 top = vec3(0.22,0.47,0.82);
-          vec3 hor = vec3(0.78,0.87,0.95);
-          vec3 c = mix(hor, top, pow(h, 0.55));
-          vec3 sunDir = normalize(vec3(-0.4,0.55,-0.7));
-          float s = max(dot(vP, sunDir), 0.0);
-          c += vec3(1.0,0.9,0.7) * (pow(s, 400.0) * 1.2 + pow(s, 8.0) * 0.18);
-          if (vP.y < 0.0) c = hor * 0.9;
-          gl_FragColor = vec4(c,1.0);
-        }`,
-    })
-    scene.add(new THREE.Mesh(geo, mat))
-    scene.fog = new THREE.Fog(0xc8dbe8, 250, 1300)
-    const hemi = new THREE.HemisphereLight(0xdcecff, 0x4a6b2a, 1.1)
-    scene.add(hemi)
-    const sun = new THREE.DirectionalLight(0xfff1dc, 2.1)
-    sun.position.set(-40, 60, -70)
-    scene.add(sun)
-  }
-
-  private buildGround() {
-    const roughTex = canvasTex(256, 256, (g) => {
-      g.fillStyle = '#3f6e27'
-      g.fillRect(0, 0, 256, 256)
-      speckle(g, 256, 256, 3500, ['#36611f', '#4a7d2e', '#3a6823', '#51853a'], 2)
-    })
-    roughTex.repeat.set(160, 160)
-    const rough = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshLambertMaterial({ map: roughTex }))
-    rough.rotation.x = -Math.PI / 2
-    rough.position.y = -0.02
-    this.group.add(rough)
-
-    const fwTex = canvasTex(256, 256, (g) => {
-      g.fillStyle = '#5c9a3a'
-      g.fillRect(0, 0, 256, 128)
-      g.fillStyle = '#4f8c31'
-      g.fillRect(0, 128, 256, 128)
-      speckle(g, 256, 256, 2500, ['#58953a', '#4a8530', '#65a342', '#528f35'], 1.5)
-    })
-    const len = RANGE_LEN + 12
-    fwTex.repeat.set(3, len / 22)
-    const fw = new THREE.Mesh(new THREE.PlaneGeometry(FAIRWAY_HALF * 2, len), new THREE.MeshLambertMaterial({ map: fwTex }))
-    fw.rotation.x = -Math.PI / 2
-    fw.position.set(0, -0.005, -len / 2 + 12)
-    this.group.add(fw)
-
-    // Tee box
-    const teeTex = canvasTex(128, 128, (g) => {
-      g.fillStyle = '#69a845'
-      g.fillRect(0, 0, 128, 128)
-      speckle(g, 128, 128, 900, ['#62a040', '#72b24d'], 1)
-    })
-    teeTex.repeat.set(2, 2)
-    const tee = new THREE.Mesh(new THREE.PlaneGeometry(10, 7), new THREE.MeshLambertMaterial({ map: teeTex }))
-    tee.rotation.x = -Math.PI / 2
-    tee.position.set(0, -0.002, 0.5)
-    this.group.add(tee)
-    // Tee markers
-    for (const x of [-3.5, 3.5]) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }))
-      m.position.set(x, 0.07, -0.4)
-      this.group.add(m)
-    }
-  }
-
-  private buildTargets() {
-    const greenTex = canvasTex(256, 256, (g) => {
-      g.fillStyle = '#6fbf4a'
-      g.fillRect(0, 0, 256, 256)
-      speckle(g, 256, 256, 1200, ['#69b845', '#76c652'], 1)
-    })
-    greenTex.repeat.set(4, 4)
-    const greenMat = new THREE.MeshLambertMaterial({ map: greenTex })
-    const fringeMat = new THREE.MeshLambertMaterial({ color: 0x5aa23a })
-    const sandTex = canvasTex(128, 128, (g) => {
-      g.fillStyle = '#e3d3a4'
-      g.fillRect(0, 0, 128, 128)
-      speckle(g, 128, 128, 1500, ['#d8c692', '#efe2b8', '#cdbb88'], 1)
-    })
-    sandTex.repeat.set(2, 2)
-    const sandMat = new THREE.MeshLambertMaterial({ map: sandTex })
-    const lipMat = new THREE.MeshLambertMaterial({ color: 0x3d6a24 })
-
-    for (const t of TARGETS) {
-      const cz = -t.yd * YD
-      const fringe = new THREE.Mesh(new THREE.CircleGeometry(t.r + 1.5, 48), fringeMat)
-      fringe.rotation.x = -Math.PI / 2
-      fringe.position.set(t.x, 0.004, cz)
-      this.group.add(fringe)
-      const green = new THREE.Mesh(new THREE.CircleGeometry(t.r, 48), greenMat)
-      green.rotation.x = -Math.PI / 2
-      green.position.set(t.x, 0.008, cz)
-      this.group.add(green)
-      for (const b of t.bunkers) {
-        const lip = new THREE.Mesh(new THREE.CircleGeometry(b.r + 0.4, 32), lipMat)
-        lip.rotation.x = -Math.PI / 2
-        lip.position.set(t.x + b.dx, 0.006, cz + b.dz)
-        lip.scale.set(1.25, 1, 1)
-        this.group.add(lip)
-        const s = new THREE.Mesh(new THREE.CircleGeometry(b.r, 32), sandMat)
-        s.rotation.x = -Math.PI / 2
-        s.position.set(t.x + b.dx, 0.01, cz + b.dz)
-        s.scale.set(1.25, 1, 1)
-        this.group.add(s)
-      }
-      this.addFlag(t, new THREE.Vector3(t.x, 0, cz))
-
-      const sign = this.textSprite(`${t.yd}`, t.color)
-      sign.position.set(t.x - t.r - 4, 2.2, cz)
-      sign.scale.set(5, 2.5, 1)
+      this.addFlag(t.color, new THREE.Vector3(t.x, heightAt(t.x, cz), cz), t, shadows)
+      const sign = this.sign(`${t.yd}`, t.color)
+      sign.position.set(t.x - t.r - 3.5, heightAt(t.x - t.r - 3.5, cz) + 1.6, cz)
+      sign.scale.set(3.6, 1.8, 1)
       this.group.add(sign)
     }
+    this.addFlag('#ffffff', new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z), null, shadows)
+    for (let yd = 50; yd <= 300; yd += 50) {
+      for (const side of [-1, 1]) {
+        const x = side * (FAIRWAY_HALF + 6)
+        const z = -yd * YD
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.12), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }))
+        post.position.set(x, heightAt(x, z) + 0.45, z)
+        post.castShadow = shadows
+        this.group.add(post)
+        const s = this.sign(`${yd}`, '#ffffff')
+        s.position.set(x, heightAt(x, z) + 1.3, z)
+        s.scale.set(1.8, 0.9, 1)
+        this.group.add(s)
+      }
+    }
+    this.buildTeeArea(shadows)
+    this.buildWindsock(shadows)
   }
 
-  private addFlag(t: Target, pos: THREE.Vector3) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 2.3, 6), new THREE.MeshLambertMaterial({ color: 0xf2f2f2 }))
-    pole.position.set(pos.x, 1.15, pos.z)
+  private addFlag(color: string, pos: THREE.Vector3, target: Target | null, shadows: boolean) {
+    // Fibreglass pin with yellow/white bands.
+    const pinTex = canvasTex(8, 64, (g) => {
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? '#f4f4f0' : '#f2c200'
+        g.fillRect(0, i * 8, 8, 8)
+      }
+    })
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 2.3, 8), new THREE.MeshStandardMaterial({ map: pinTex, roughness: 0.35 }))
+    pole.position.set(pos.x, pos.y + 1.15, pos.z)
+    pole.castShadow = shadows
     this.group.add(pole)
-    const cup = new THREE.Mesh(new THREE.CircleGeometry(0.054, 16), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }))
+    const cup = new THREE.Mesh(new THREE.RingGeometry(0.035, 0.054, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }))
     cup.rotation.x = -Math.PI / 2
-    cup.position.set(pos.x, 0.012, pos.z)
+    cup.position.set(pos.x, pos.y + 0.006, pos.z)
     this.group.add(cup)
-    const geo = new THREE.PlaneGeometry(0.75, 0.5, 10, 4)
-    geo.translate(0.375, 0, 0)
-    const cloth = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: t.color, side: THREE.DoubleSide }))
-    cloth.position.set(pos.x, 2.05, pos.z)
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(0.036, 24), new THREE.MeshBasicMaterial({ color: 0x0b0b0b }))
+    hole.rotation.x = -Math.PI / 2
+    hole.position.set(pos.x, pos.y + 0.007, pos.z)
+    this.group.add(hole)
+    const geo = new THREE.PlaneGeometry(0.6, 0.4, 12, 5)
+    geo.translate(0.3, 0, 0)
+    const cloth = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.8 }))
+    cloth.position.set(pos.x, pos.y + 2.08, pos.z)
+    cloth.castShadow = shadows
     this.group.add(cloth)
-    this.flags.push({ pos, cloth, base: Float32Array.from(geo.attributes.position.array as Float32Array), target: t })
+    this.flags.push({ pos, cloth, base: Float32Array.from(geo.attributes.position.array as Float32Array), target })
   }
 
-  textSprite(text: string, color: string) {
+  // Clean broadcast-style yardage board.
+  private sign(text: string, accent: string) {
     const tex = canvasTex(256, 128, (g) => {
-      g.fillStyle = 'rgba(20,32,20,0.82)'
+      g.fillStyle = 'rgba(12,18,14,0.78)'
       g.beginPath()
-      g.roundRect(8, 8, 240, 112, 18)
+      g.roundRect(4, 4, 248, 120, 14)
       g.fill()
-      g.strokeStyle = color
-      g.lineWidth = 6
-      g.stroke()
+      g.fillStyle = accent
+      g.fillRect(24, 100, 208, 5)
       g.fillStyle = '#fff'
-      g.font = 'bold 72px system-ui, sans-serif'
+      g.font = '600 64px "Inter", system-ui, sans-serif'
       g.textAlign = 'center'
       g.textBaseline = 'middle'
-      g.fillText(text, 128, 68)
+      g.fillText(text, 128, 56)
     })
     return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, fog: true }))
   }
 
-  private buildTrees() {
-    const pts: { x: number; z: number; s: number; phase: number }[] = []
-    const rnd = (a: number, b: number) => a + Math.random() * (b - a)
-    for (let z = 10; z > -RANGE_LEN - 60; z -= rnd(9, 16)) {
-      for (const side of [-1, 1]) {
-        pts.push({ x: side * rnd(FAIRWAY_HALF + 18, FAIRWAY_HALF + 34), z: z + rnd(-4, 4), s: rnd(0.8, 1.35), phase: rnd(0, 6) })
-        if (Math.random() < 0.6) pts.push({ x: side * rnd(FAIRWAY_HALF + 38, FAIRWAY_HALF + 70), z: z + rnd(-6, 6), s: rnd(0.9, 1.5), phase: rnd(0, 6) })
-      }
+  private buildTeeArea(shadows: boolean) {
+    // Tee markers: polished spheres on the box.
+    for (const x of [-4.5, 4.5]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 24, 16), new THREE.MeshStandardMaterial({ color: 0x1a4f9c, roughness: 0.25, metalness: 0.2 }))
+      m.position.set(x, 0.07, -1.5)
+      m.castShadow = shadows
+      this.group.add(m)
     }
-    for (let x = -140; x < 140; x += rnd(7, 12)) pts.push({ x, z: -RANGE_LEN - rnd(40, 70), s: rnd(1.1, 1.8), phase: rnd(0, 6) })
-    this.treeData = pts
-    const foliageGeo = new THREE.ConeGeometry(3.2, 10, 7)
-    foliageGeo.translate(0, 8, 0)
-    const trunkGeo = new THREE.CylinderGeometry(0.28, 0.4, 3.5, 6)
-    trunkGeo.translate(0, 1.75, 0)
-    this.trees = new THREE.InstancedMesh(foliageGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), pts.length)
-    this.trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshLambertMaterial({ color: 0x5a3f28 }), pts.length)
-    const c = new THREE.Color()
-    pts.forEach((_, i) => {
-      c.setHSL(0.26 + Math.random() * 0.07, 0.35 + Math.random() * 0.2, 0.3 + Math.random() * 0.12)
-      this.trees.setColorAt(i, c)
-    })
-    this.group.add(this.trees, this.trunks)
-    this.updateTrees(0, { speed: 0, dir: 0, gust: 0, phase: 0 })
+    // A bench and ball bucket give the tee some scale.
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6d4c33, roughness: 0.8 })
+    const metal = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.4, metalness: 0.8 })
+    const bench = new THREE.Group()
+    for (let i = 0; i < 3; i++) {
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.12), wood)
+      slat.position.set(0, 0.45, i * 0.14)
+      bench.add(slat)
+    }
+    for (const x of [-0.8, 0.8]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.4), metal)
+      leg.position.set(x, 0.225, 0.14)
+      bench.add(leg)
+    }
+    bench.position.set(6.5, 0, 3)
+    bench.rotation.y = -0.4
+    bench.traverse((o) => (o.castShadow = shadows))
+    this.group.add(bench)
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.28, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0x1f5f3a, roughness: 0.5, side: THREE.DoubleSide }))
+    bucket.position.set(1.6, 0.14, 1.2)
+    bucket.castShadow = shadows
+    this.group.add(bucket)
+    const balls = new THREE.InstancedMesh(new THREE.SphereGeometry(0.0213, 12, 8), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.35 }), 30)
+    const d = new THREE.Object3D()
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2
+      const r = Math.random() * 0.13
+      d.position.set(1.6 + Math.cos(a) * r, 0.2 + Math.random() * 0.07, 1.2 + Math.sin(a) * r)
+      d.updateMatrix()
+      balls.setMatrixAt(i, d.matrix)
+    }
+    this.group.add(balls)
   }
 
-  private buildMarkers() {
-    for (let yd = 50; yd <= 300; yd += 50) {
-      for (const side of [-1, 1]) {
-        const s = this.textSprite(`${yd}`, '#ffffff')
-        s.position.set(side * (FAIRWAY_HALF + 3), 1.4, -yd * YD)
-        s.scale.set(2.6, 1.3, 1)
-        this.group.add(s)
-      }
-    }
-  }
-
-  private buildWindsock() {
+  private buildWindsock(shadows: boolean) {
     const g = new THREE.Group()
-    g.position.set(-5.5, 0, -2)
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 4.2, 8), new THREE.MeshLambertMaterial({ color: 0xdddddd }))
+    g.position.set(-8, 0, -1)
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 4.2, 10), new THREE.MeshStandardMaterial({ color: 0xcfd3d6, roughness: 0.3, metalness: 0.7 }))
     pole.position.y = 2.1
+    pole.castShadow = shadows
     g.add(pole)
-    const sockGeo = new THREE.CylinderGeometry(0.24, 0.1, 1.6, 12, 4, true)
+    const sockGeo = new THREE.CylinderGeometry(0.24, 0.1, 1.6, 16, 5, true)
     sockGeo.rotateX(Math.PI / 2)
     sockGeo.translate(0, 0, -0.8)
-    // Orange/white bands via vertex colours
     const cols: number[] = []
     const pos = sockGeo.attributes.position
     for (let i = 0; i < pos.count; i++) {
-      const band = Math.floor((-pos.getZ(i) / 1.6) * 4.999)
-      const white = band % 2 === 1
-      cols.push(1, white ? 1 : 0.45, white ? 1 : 0.05)
+      const white = Math.floor((-pos.getZ(i) / 1.6) * 4.999) % 2 === 1
+      cols.push(1, white ? 1 : 0.35, white ? 1 : 0.04)
     }
     sockGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
-    this.sockMesh = new THREE.Mesh(sockGeo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }))
+    this.sockMesh = new THREE.Mesh(sockGeo, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 }))
+    this.sockMesh.castShadow = shadows
     const pivot = new THREE.Group()
     pivot.position.y = 4.1
     pivot.add(this.sockMesh)
@@ -305,48 +185,24 @@ export class Range {
     this.group.add(g)
   }
 
-  private updateTrees(t: number, wind: Wind) {
-    const w = windAt(wind, 8, t)
-    const s = Math.hypot(w.x, w.z)
-    const lean = Math.min(0.09, s * 0.008)
-    const ax = s > 0 ? w.x / s : 0
-    const az = s > 0 ? w.z / s : 0
-    this.treeData.forEach((p, i) => {
-      const sway = lean + Math.sin(t * (1.2 + p.s * 0.3) + p.phase) * (0.006 + s * 0.0022)
-      this.dummy.position.set(p.x, 0, p.z)
-      this.dummy.rotation.set(az * sway, 0, -ax * sway)
-      this.dummy.scale.setScalar(p.s)
-      this.dummy.updateMatrix()
-      this.trees.setMatrixAt(i, this.dummy.matrix)
-      this.dummy.rotation.set(0, 0, 0)
-      this.dummy.updateMatrix()
-      this.trunks.setMatrixAt(i, this.dummy.matrix)
-    })
-    this.trees.instanceMatrix.needsUpdate = true
-    this.trunks.instanceMatrix.needsUpdate = true
-  }
-
   update(t: number, wind: Wind) {
-    // Flags: stream downwind, stiffer and flatter the harder it blows.
     for (const f of this.flags) {
       const w = windAt(wind, 2, t + f.pos.z * 0.01)
       const s = Math.hypot(w.x, w.z)
-      const yaw = Math.atan2(-w.z, w.x)
-      f.cloth.rotation.y = s > 0.2 ? yaw : f.cloth.rotation.y
+      if (s > 0.2) f.cloth.rotation.y = Math.atan2(-w.z, w.x)
       const pos = f.cloth.geometry.attributes.position as THREE.BufferAttribute
       const lift = Math.min(1, s / 9)
       for (let i = 0; i < pos.count; i++) {
         const bx = f.base[i * 3]
         const by = f.base[i * 3 + 1]
-        const k = bx / 0.75
+        const k = bx / 0.6
         const droop = (1 - lift) * k * 0.95
-        const wave = Math.sin(t * (5 + s * 0.9) - bx * 9) * k * (0.04 + 0.08 * lift)
-        pos.setXYZ(i, bx * Math.cos(droop), by - bx * Math.sin(droop) - (1 - lift) * 0.05 * k, wave)
+        const wave = Math.sin(t * (5 + s * 0.9) - bx * 10) * k * (0.03 + 0.07 * lift)
+        pos.setXYZ(i, bx * Math.cos(droop), by - bx * Math.sin(droop) - (1 - lift) * 0.04 * k, wave)
       }
       pos.needsUpdate = true
       f.cloth.geometry.computeVertexNormals()
     }
-    // Windsock points downwind and fills as the wind picks up.
     const w = windAt(wind, 4, t)
     const s = Math.hypot(w.x, w.z)
     const fill = Math.min(1, s / 8)
@@ -354,6 +210,7 @@ export class Range {
     if (s > 0.15) this.sock.rotation.y = Math.atan2(-w.x, -w.z)
     this.sock.rotation.x = -(1 - fill) * 1.25 + Math.sin(t * 3.1) * 0.03 * (1 - fill * 0.5)
     this.sockMesh.rotation.z = Math.sin(t * 7) * 0.05 * fill
-    this.updateTrees(t, wind)
+    this.trees.update(t, wind)
+    this.terrain.update(t)
   }
 }

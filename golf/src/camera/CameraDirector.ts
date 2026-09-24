@@ -18,6 +18,7 @@ export class CameraDirector {
   private shakeAmt = 0
   private modeT = 0
   private fov = 50
+  private hold = false // stay put and just watch (putting)
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.05, 4000)
@@ -27,13 +28,25 @@ export class CameraDirector {
     return new THREE.Vector3(Math.sin(aim), 0, -Math.cos(aim))
   }
 
-  address(ball: THREE.Vector3, aim: number, snap = false) {
+  address(ball: THREE.Vector3, aim: number, snap = false, putting = false) {
     this.mode = 'address'
     this.modeT = 0
+    this.hold = false
     const f = this.fwd(aim)
+    if (putting) {
+      // Crouched behind the ball reading the line.
+      this.goalPos.copy(ball).addScaledVector(f, -1.9).add(new THREE.Vector3(0, 0.75, 0))
+      this.goalLook.copy(ball).addScaledVector(f, 9).add(new THREE.Vector3(0, -1.4, 0))
+      this.fov = 45
+      if (snap) {
+        this.pos.copy(this.goalPos)
+        this.look.copy(this.goalLook)
+      }
+      return
+    }
     // Behind the ball, looking down the range: ball low in frame, targets visible.
-    this.goalPos.copy(ball).addScaledVector(f, -2.6).add(new THREE.Vector3(0, 1.1, 0))
-    this.goalLook.copy(ball).addScaledVector(f, 30).add(new THREE.Vector3(0, -6, 0))
+    this.goalPos.copy(ball).addScaledVector(f, -3.1).add(new THREE.Vector3(0, 1.45, 0))
+    this.goalLook.copy(ball).addScaledVector(f, 40).add(new THREE.Vector3(0, -6.5, 0))
     this.fov = 50
     if (snap) {
       this.pos.copy(this.goalPos)
@@ -51,9 +64,10 @@ export class CameraDirector {
     this.fov = 40
   }
 
-  launch(landing: THREE.Vector3) {
+  launch(landing: THREE.Vector3, hold = false) {
     this.mode = 'launch'
     this.modeT = 0
+    this.hold = hold
     this.landingSpot.copy(landing)
   }
 
@@ -94,6 +108,7 @@ export class CameraDirector {
       case 'launch': {
         // Hold the down-the-line view for a beat so you see it leave.
         this.look.lerp(ball, damp(10, dt))
+        if (this.hold) break
         if (this.modeT > 0.45 && this.style === 'chase') this.mode = 'chase'
         if (this.style === 'tracer') {
           const hold = new THREE.Vector3().copy(this.goalPos).add(new THREE.Vector3(0, 1.4, 0)).addScaledVector(f, -3)
@@ -124,7 +139,7 @@ export class CameraDirector {
         this.look.lerp(ball, damp(this.modeT < 0.05 ? 1000 : 9, dt))
         break
       case 'rest': {
-        if (this.style === 'tracer') {
+        if (this.style === 'tracer' || this.hold) {
           this.look.lerp(ball, damp(4, dt))
           break
         }

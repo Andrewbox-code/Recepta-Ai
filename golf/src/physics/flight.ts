@@ -154,6 +154,12 @@ export function simulate(l: Launch, start: V3, aim: number, env: Env, dt = 1 / 2
       const sp = Math.hypot(vel.x, vel.z)
       const s = surf(p.x, p.z)
       restSurface = s.id
+      if (s.id === 'water') {
+        // Trickled in. It's gone.
+        p.y = groundY(p.x, p.z) - 0.3
+        vel = v3()
+        break
+      }
       const dv = (s.rollDecel + s.rollDrag * sp) * dt
       if (sp <= dv) {
         vel = v3()
@@ -187,6 +193,13 @@ export function simulate(l: Launch, start: V3, aim: number, env: Env, dt = 1 / 2
           landAngle = (Math.atan2(vn, Math.hypot(vel.x, vel.z)) * 180) / Math.PI
         }
         bounces.push({ t, p: { ...p }, surface: s.id, speed: len(vel) })
+        if (s.id === 'water') {
+          restSurface = 'water'
+          points.push({ t, p: { ...p }, spin: 0, phase: 1 })
+          p.y -= 0.35
+          vel = v3()
+          break
+        }
         const e = s.restitution / (1 + vn * 0.045)
         // The turf gives: a steep landing plugs a little and loses pace.
         const soak = 1 - s.turfLoss * (vn / (vn + 6))

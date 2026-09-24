@@ -44,8 +44,10 @@ export const TUNING = {
   toeMmPerU: 80,
 }
 
-export function computeTempoChaos(m: SwingMetrics, swingPct: number) {
-  const tempoErr = clamp((Math.abs(Math.log(m.tempoRatio / TUNING.idealTempo)) - 0.3) / 0.8, 0, 1)
+export function computeTempoChaos(m: SwingMetrics, swingPct: number, putting = false) {
+  // A putting stroke is naturally about 2:1; a full swing about 3:1.
+  const ideal = putting ? 2 : TUNING.idealTempo
+  const tempoErr = clamp((Math.abs(Math.log(m.tempoRatio / ideal)) - 0.3) / 0.8, 0, 1)
   const transErr = clamp((0.26 - m.rampFrac) / 0.2, 0, 1) // snatched from the top
   const overErr = clamp((swingPct - 1.03) / 0.25, 0, 1.5) // swinging out of your shoes
   const shortErr = clamp((0.45 - m.depth) / 0.25, 0, 1) * clamp(swingPct - 0.6, 0, 1) // all arms, no turn
@@ -61,7 +63,7 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
   const swingPct = m.speed / speedRef
   const effort = swingPct <= 1 ? swingPct : 1 + 0.12 * (1 - Math.exp(-(swingPct - 1) * 2.5))
   const clubSpeed = club.maxSpeed * effort
-  const { transErr, chaos } = computeTempoChaos(m, swingPct)
+  const { transErr, chaos } = computeTempoChaos(m, swingPct, !!club.putter)
 
   // A rushed transition throws the club over the top: path goes left, face
   // stays a bit open relative to it (the classic pull-slice).
@@ -81,6 +83,8 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
     70,
   )
   const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.8 + 4 * chaos)
+
+  if (club.putter) return puttLaunch(m, club, swingPct, path, face, chaos, rng)
 
   const faceHalf = club.wood ? 48 : 32
   const hosel = club.wood ? -40 : -26
@@ -172,5 +176,35 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
     chaos,
     contact,
     quality,
+  }
+}
+
+// Putting: no turf interaction and no curve in the air. Speed control and
+// start line are everything; a toe/heel strike just comes up short.
+function puttLaunch(m: SwingMetrics, club: Club, swingPct: number, path: number, face: number, chaos: number, rng: Rng): Launch {
+  const clubSpeed = club.maxSpeed * swingPct
+  const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.5 + 3 * chaos)
+  const off = Math.min(1, Math.abs(toeMm) / 40)
+  const eff = 1 - off * off * 0.45
+  const whiff = Math.abs(toeMm) > 62
+  const contact: Contact = whiff ? 'whiff' : off > 0.45 ? (toeMm > 0 ? 'toe' : 'heel') : off > 0.15 ? 'good' : 'pure'
+  // A putter face barely curves the start line off the path.
+  const f = face * 0.5
+  const p = path * 0.5
+  return {
+    clubSpeed,
+    ballSpeed: whiff ? 0 : clubSpeed * club.smash * eff,
+    launchV: club.launch,
+    launchH: f * club.faceWeight + p * (1 - club.faceWeight),
+    spinRpm: 150,
+    tiltDeg: 0,
+    path: p,
+    face: f,
+    depthMm: 0,
+    toeMm,
+    swingPct,
+    chaos,
+    contact,
+    quality: whiff ? 0 : eff,
   }
 }
