@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { CLUBS, clubById, type Club } from './physics/clubs'
 import { Grass } from './world/Grass'
+import { Club3D } from './world/Club3D'
+import { PuttGrid } from './world/PuttGrid'
 import { PRACTICE } from './world/layout'
 import { LIES, type Lie, type LieId } from './physics/lies'
 import { computeLaunch, type Launch } from './physics/impact'
@@ -108,6 +110,13 @@ class Game {
   grass: Grass[] = []
   stock: Record<string, number> = {}
   freshPutt = false
+  club3d!: Club3D
+  puttGrid!: PuttGrid
+  view: 'play' | 'map' | 'eye' = 'play'
+  shotCount = 0
+  bestProx = Infinity
+  holed = 0
+  lastPin = new THREE.Vector3()
   baseAim = 0 // straight down the range, or at the cup when putting
 
   constructor() {
@@ -118,7 +127,7 @@ class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 0.5
+    this.renderer.toneMappingExposure = 0.72
     this.renderer.shadowMap.enabled = high
     this.renderer.shadowMap.type = THREE.PCFShadowMap
 
@@ -131,6 +140,8 @@ class Game {
       this.grass.push(new Grass(this.scene, new THREE.Vector2(PRACTICE.x, PRACTICE.z), 13, high))
     }
     this.stock = Object.fromEntries(CLUBS.map((c) => [c.id, stockDistance(c)]))
+    this.club3d = new Club3D(this.scene, high)
+    this.puttGrid = new PuttGrid(this.scene)
     this.debris = new Debris(this.scene)
     this.tracer = new Tracer(this.scene)
     this.marks = new GroundMarks(this.scene)
@@ -151,6 +162,14 @@ class Game {
     this.input = new SwingInput(canvas, {
       onLive: (s) => {
         this.overlay.setLive(s)
+        if (s.phase !== 'idle') {
+          if (this.view !== 'play') this.setView('play')
+          $('data').classList.add('hidden')
+          $('bagPop').classList.add('hidden')
+          $('liePop').classList.add('hidden')
+          const last = s.points[s.points.length - 1]
+          this.club3d.setSwing((last.y - s.origin.y) / s.unit)
+        } else if (this.state === 'address') this.club3d.setSwing(0)
         this.audio.swingSpeed(s.speed, s.phase === 'down' || s.phase === 'through')
       },
       onSwing: (m, samples, unit) => this.onSwing(m, samples[0].x, samples[0].y, unit),
@@ -162,6 +181,7 @@ class Game {
       else if (this.state === 'rest' && this.restTimer < 2.2) this.reset()
     })
 
+    this.cam.fovScale = window.innerWidth < window.innerHeight ? 1.4 : 1
     this.newWind()
     this.buildHud()
     this.setLie(this.lie, false)
@@ -183,7 +203,7 @@ class Game {
     )
     let last = performance.now()
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000))
       last = now
       this.update(dt)
       requestAnimationFrame(loop)
@@ -210,6 +230,7 @@ class Game {
     this.ball.mesh.rotation.set(0, Math.random() * 6, 0)
     this.cam.address(p, this.aim, snap, !!this.club.putter)
     this.input.enabled = true
+    this.refreshAddress()
     this.aimLine.visible = true
     this.tracer.opacity = 0.35
     $('hint').classList.toggle('fade', this.swung)
@@ -226,6 +247,9 @@ class Game {
     this.swung = true
     $('hint').classList.add('fade')
     this.input.enabled = false
+    this.club3d.finish()
+    this.puttGrid.hide()
+    this.shotCount++
     const launch = computeLaunch(m, this.club, this.lie, this.speedRef, Math.random)
     this.overlay.hold(m, launch, ox, oy, unit)
     const start = this.ball.mesh.position.clone()
@@ -438,6 +462,17 @@ class Game {
     $('dTotal').textContent = `${yd(total).toFixed(1)}`
     $('dOffline').textContent = `${Math.abs(yd(off)).toFixed(1)} ${off > 0.5 ? 'R' : off < -0.5 ? 'L' : ''}`
     $('dApex').textContent = `${yd(r.apex).toFixed(0)}`
+    // Score cards: last carry and closest-to-pin (or putts holed).
+    const pinDist = Math.hypot(rest.x - this.lastPin.x, rest.z - this.lastPin.z)
+    if (s.club.putter) {
+      $('scoreBig').textContent = s.holed ? 'IN' : `${(pinDist / 0.3048).toFixed(1)}′`
+      $('scoreSmall').textContent = s.holed ? 'holed' : 'left'
+      if (s.holed) this.holed++
+    } else if (s.launch.contact !== 'whiff' && r.restSurface !== 'water') {
+      $('scoreBig').textContent = `${Math.round(yd(r.carry))}`
+      $('scoreSmall').textContent = 'last carry'
+      this.bestProx = Math.min(this.bestProx, yd(pinDist))
+    }
     if (s.launch.contact !== 'whiff') {
       this.marks.marker(rest, CLUB_COLORS[s.club.id] ?? 0xffffff)
       this.history.unshift({ club: s.club.short, carry: yd(r.carry), total: yd(total), off: yd(off) })
@@ -495,8 +530,15 @@ class Game {
     document.querySelectorAll<HTMLButtonElement>('#clubs button').forEach((b) => b.classList.toggle('on', b.dataset.club === c.id))
     $('clubName').textContent = c.name
     $('clubMeta').textContent = c.putter ? 'Practice green' : `${c.loft}° · ${Math.round(this.stock[c.id] ?? 0)} yd carry`
-    document.querySelector('#clubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
-    $('lies').classList.toggle('hidden', !!c.putter)
+    $('clubShort').textContent = c.putter ? 'P' : c.short
+    $('clubSub').textContent = c.putter ? 'putt' : `${Math.round(this.stock[c.id] ?? 0)}y`
+    this.club3d.setClub(c)
+    if (wasPutter !== !!c.putter) {
+      this.shotCount = 0
+      this.bestProx = Infinity
+      this.holed = 0
+      $('scoreBig').textContent = '—'
+    }
     if (c.putter) {
       this.newPutt()
       return
@@ -535,6 +577,7 @@ class Game {
     this.aim = this.baseAim
     this.lie = LIES.green
     $('clubMeta').textContent = `Practice green · ${Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z).toFixed(1)} m to the cup`
+    $('clubSub').textContent = `${Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z).toFixed(1)}m`
     this.reset(true)
     this.nudgeAim(0)
   }
@@ -546,6 +589,7 @@ class Game {
     const p = new THREE.Vector3(this.tee.x, Ball.restY(l), this.tee.z)
     this.ball.place(p)
     this.ball.setLie(l, this.tee)
+    this.refreshAddress()
     if (look) {
       // Show the player how it's sitting.
       this.cam.lieCheck(p, this.aim)
@@ -553,10 +597,84 @@ class Game {
     }
   }
 
+  // Club behind the ball, grid on the green, the info cards.
+  refreshAddress() {
+    if (this.state !== 'address') return
+    const b = this.ball.mesh.position
+    this.club3d.setClub(this.club)
+    this.club3d.address(b, this.aim, this.range.groundY(b.x, b.z))
+    if (this.club.putter) this.puttGrid.show(b, new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z))
+    else this.puttGrid.hide()
+    const lieCard = $('lieIco')
+    lieCard.className = `ico lie-${this.lie.id}`
+    $('lieName').textContent = this.lie.id === 'sand' ? 'Bunker' : this.lie.name
+    $('holeL1').textContent = this.club.putter ? 'Practice' : 'Driving'
+    $('holeL2').textContent = this.club.putter ? 'Green' : 'Range'
+    $('holeL3').textContent = `${this.club.putter ? 'Putt' : 'Shot'} ${this.shotCount + 1}`
+    $('bestText').textContent = this.club.putter ? `${this.holed} holed` : Number.isFinite(this.bestProx) ? `${this.bestProx.toFixed(1)} yds` : 'Closest —'
+    this.updatePin()
+  }
+
+  // The flag you're playing at: the cup when putting, otherwise the range
+  // green closest to your aim line.
+  updatePin() {
+    const b = this.ball.mesh.position
+    let pin: THREE.Vector3
+    if (this.club.putter) pin = new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z)
+    else {
+      // Among the greens roughly down your aim line, the one nearest this club's stock carry.
+      const fwd = new THREE.Vector2(Math.sin(this.aim), -Math.cos(this.aim))
+      const stock = (this.stock[this.club.id] ?? 150) * YD
+      let best = Infinity
+      pin = this.range.flags[0].pos
+      for (const f of this.range.flags) {
+        if (!f.target) continue
+        const v = new THREE.Vector2(f.pos.x - b.x, f.pos.z - b.z)
+        const off = Math.abs(Math.atan2(v.x * fwd.y - v.y * fwd.x, v.dot(fwd)))
+        const score = Math.abs(v.length() - stock) + Math.max(0, off - 0.12) * 2000
+        if (score < best) {
+          best = score
+          pin = f.pos
+        }
+      }
+    }
+    this.lastPin.copy(pin)
+    const d = Math.hypot(pin.x - b.x, pin.z - b.z)
+    const dy = yd(this.range.groundY(pin.x, pin.z) - this.range.groundY(b.x, b.z))
+    const elev = `${dy >= 0 ? '+' : '−'}${Math.abs(dy).toFixed(1)}`
+    $('pinDist').textContent = this.club.putter ? `${(d / 0.3048).toFixed(1)} ft` : `${yd(d).toFixed(0)} yds (${elev})`
+  }
+
+  // Overview map / look-at-the-target views, only while addressing the ball.
+  setView(v: 'play' | 'map' | 'eye') {
+    if (this.state !== 'address' && v !== 'play') return
+    this.view = this.view === v ? 'play' : v
+    $('mapBtn').classList.toggle('on', this.view === 'map')
+    $('eyeBtn').classList.toggle('on', this.view === 'eye')
+    const b = this.ball.mesh.position
+    const f = new THREE.Vector3(Math.sin(this.aim), 0, -Math.cos(this.aim))
+    if (this.view === 'map') {
+      const dist = this.club.putter ? 10 : Math.min(260, Math.max(80, this.stock[this.club.id] * YD))
+      const mid = b.clone().addScaledVector(f, dist * 0.55)
+      this.cam.view(mid.clone().addScaledVector(f, -dist * 0.35).setY(dist * 1.1), mid)
+    } else if (this.view === 'eye') {
+      const pin = this.lastPin
+      const back = new THREE.Vector3(pin.x - b.x, 0, pin.z - b.z).normalize()
+      const at = pin.clone().addScaledVector(back, this.club.putter ? -2.5 : -18).setY(this.range.groundY(pin.x, pin.z) + (this.club.putter ? 0.6 : 3))
+      this.cam.view(at, pin.clone().setY(this.range.groundY(pin.x, pin.z)))
+    } else this.cam.address(b, this.aim, false, !!this.club.putter)
+  }
+
   // ---------- HUD ----------
 
   buildHud() {
     $('clubs').innerHTML = CLUBS.map((c) => `<button data-club="${c.id}" title="${c.name}">${c.short}</button>`).join('')
+    $('clubBtn').addEventListener('click', () => $('bagPop').classList.toggle('hidden'))
+    $('lieCard').addEventListener('click', () => {
+      if (!this.club.putter) $('liePop').classList.toggle('hidden')
+    })
+    $('mapBtn').addEventListener('click', () => this.setView('map'))
+    $('eyeBtn').addEventListener('click', () => this.setView('eye'))
     $('clubPrev').addEventListener('click', () => this.cycleClub(-1))
     $('clubNext').addEventListener('click', () => this.cycleClub(1))
     document.querySelectorAll<HTMLButtonElement>('[data-quality]').forEach((b) => {
@@ -569,12 +687,14 @@ class Game {
     $('clubs').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).dataset.club
       if (id) this.setClub(CLUBS.find((c) => c.id === id)!)
+      $('bagPop').classList.add('hidden')
     })
     const lieIds: LieId[] = ['tee', 'fairway', 'rough', 'sand', 'hardpan']
     $('lies').innerHTML = lieIds.map((id) => `<button data-lie="${id}">${LIES[id].name}</button>`).join('')
     $('lies').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).dataset.lie as LieId | undefined
       if (id) this.setLie(LIES[id])
+      $('liePop').classList.add('hidden')
     })
     this.setClub(this.club)
     this.setLie(this.lie, false)
@@ -649,8 +769,9 @@ class Game {
     const step = (dir * Math.PI) / 180 / (this.club.putter ? 4 : 1)
     this.aim = this.baseAim + Math.max(-0.35, Math.min(0.35, this.aim - this.baseAim + step))
     this.cam.address(this.ball.mesh.position, this.aim, false, !!this.club.putter)
+    this.refreshAddress()
     const d = Math.round(((this.aim - this.baseAim) * 180) / Math.PI * (this.club.putter ? 4 : 1)) / (this.club.putter ? 4 : 1)
-    $('aimText').textContent = d === 0 ? 'Aim 0°' : `Aim ${Math.abs(d)}° ${d > 0 ? 'R' : 'L'}`
+    $('aimText').textContent = d === 0 ? '0°' : `${Math.abs(d)}°${d > 0 ? 'R' : 'L'}`
   }
 
   showLaunch(l: Launch) {
@@ -659,6 +780,7 @@ class Game {
     $('dLaunch').textContent = `${l.launchV.toFixed(1)}°`
     $('dSpin').textContent = `${Math.round(l.spinRpm / 10) * 10}`
     for (const id of ['dCarry', 'dTotal', 'dOffline', 'dApex']) $(id).textContent = '…'
+    $('data').classList.remove('hidden')
   }
 
   fillLab(m: SwingMetrics, l: Launch) {
@@ -757,6 +879,7 @@ class Game {
   }
 
   resize() {
+    this.cam.fovScale = window.innerWidth < window.innerHeight ? 1.4 : 1
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.cam.camera.aspect = window.innerWidth / window.innerHeight
     this.cam.camera.updateProjectionMatrix()
@@ -788,6 +911,9 @@ class Game {
     const vel = this.shot ? this.sample(this.shot.result.points, this.shot, this.shot.t).v : new THREE.Vector3()
     this.cam.update(dt, this.ball.mesh.position, vel, this.aim)
     this.ball.update(sdt, this.cam.camera, window.innerHeight)
+    if (this.state === 'flight' && this.shot && this.shot.t > 0.25) this.club3d.hide()
+    this.club3d.update(dt)
+    this.puttGrid.update(dt, this.worldT)
     this.debris.update(sdt)
     this.tracer.update(this.cam.camera)
     this.range.update(this.worldT, this.wind)

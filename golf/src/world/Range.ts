@@ -3,6 +3,7 @@ import { windAt, type Wind } from '../physics/flight'
 import { Atmosphere } from './Atmosphere'
 import { Terrain } from './Terrain'
 import { Trees } from './Trees'
+import { Flora } from './Flora'
 import { FAIRWAY_HALF, PRACTICE, TARGETS, YD, heightAt, surfaceAt, groundY, type Target } from './layout'
 
 export { YD, TARGETS }
@@ -42,6 +43,7 @@ export class Range {
     this.atmosphere = new Atmosphere(scene, renderer, shadows)
     this.terrain = new Terrain(scene, this.atmosphere.sunDir)
     this.trees = new Trees(scene, shadows)
+    new Flora(scene, shadows)
     for (const t of TARGETS) {
       const cz = -t.yd * YD
       this.addFlag(t.color, new THREE.Vector3(t.x, heightAt(t.x, cz), cz), t, shadows)

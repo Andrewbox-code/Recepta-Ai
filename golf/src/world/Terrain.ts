@@ -53,14 +53,14 @@ function paintSplat() {
   // Canvas row 0 is AZ0 (far end); flipY is off so it lines up with the mesh.
 
   // Rough: mottled, darker, bluer.
-  g.fillStyle = '#34561d'
+  g.fillStyle = '#5a9427'
   g.fillRect(0, 0, W, H)
   for (let i = 0; i < 1800; i++) {
     const x = Math.random() * W
     const y = Math.random() * H
     const r = M(2 + Math.random() * 9)
     const gr = g.createRadialGradient(x, y, 0, x, y, r)
-    const col = Math.random() < 0.5 ? '64,98,36' : '40,68,24'
+    const col = Math.random() < 0.5 ? '112,166,52' : '74,128,32'
     gr.addColorStop(0, `rgba(${col},0.35)`)
     gr.addColorStop(1, `rgba(${col},0)`)
     g.fillStyle = gr
@@ -74,14 +74,14 @@ function paintSplat() {
     for (let z = -RANGE_LEN; z <= 12; z += 2) g.lineTo(X(FAIRWAY_HALF + fairwayWobble(z) + grow), Z(z))
     g.closePath()
   }
-  g.fillStyle = '#42702a'
+  g.fillStyle = '#6aa62f'
   fairwayPath(2.2)
   g.fill()
   g.save()
   fairwayPath(0)
   g.clip()
   for (let z = 12; z > -RANGE_LEN - 12; z -= 12) {
-    g.fillStyle = Math.floor(-z / 12) % 2 ? '#4c8429' : '#5b9531'
+    g.fillStyle = Math.floor(-z / 12) % 2 ? '#7cb836' : '#8cc63f'
     g.fillRect(0, Z(z - 12), W, M(12))
   }
   // Diagonal cross-cut, very subtle.
@@ -98,7 +98,7 @@ function paintSplat() {
   g.restore()
 
   // Tee box, worn with divots in the hitting area.
-  g.fillStyle = '#5f9a36'
+  g.fillStyle = '#92cb45'
   g.fillRect(X(TEE_BOX.x0), Z(TEE_BOX.z0), M(TEE_BOX.x1 - TEE_BOX.x0), M(TEE_BOX.z1 - TEE_BOX.z0))
   for (let i = 0; i < 160; i++) {
     const x = TEE_BOX.x0 + 0.5 + Math.random() * (TEE_BOX.x1 - TEE_BOX.x0 - 1)
@@ -109,13 +109,13 @@ function paintSplat() {
   }
 
   const greenAt = (x: number, z: number, r: number) => {
-    g.fillStyle = '#4e8a2c'
+    g.fillStyle = '#7ab83a'
     g.beginPath()
     g.arc(X(x), Z(z), M(r + 1.5), 0, Math.PI * 2)
     g.fill()
     const gr = g.createRadialGradient(X(x), Z(z), 0, X(x), Z(z), M(r))
-    gr.addColorStop(0, '#6fae3e')
-    gr.addColorStop(1, '#62a236')
+    gr.addColorStop(0, '#a6d856')
+    gr.addColorStop(1, '#98cf4a')
     g.fillStyle = gr
     g.beginPath()
     g.arc(X(x), Z(z), M(r), 0, Math.PI * 2)
@@ -138,14 +138,14 @@ function paintSplat() {
       g.save()
       g.translate(cx, cy)
       g.scale(k.rx / k.rz, 1)
-      g.fillStyle = '#6b6242'
+      g.fillStyle = '#6f8f2c'
       g.beginPath()
       g.arc(0, 0, M(k.rz + 0.35), 0, Math.PI * 2)
       g.fill()
       const sg = g.createRadialGradient(0, -M(k.rz * 0.3), 0, 0, 0, M(k.rz))
-      sg.addColorStop(0, '#efe3c2')
-      sg.addColorStop(0.75, '#e2d3a8')
-      sg.addColorStop(1, '#c8b686')
+      sg.addColorStop(0, '#fbe9a6')
+      sg.addColorStop(0.75, '#f3da88')
+      sg.addColorStop(1, '#d9bb62')
       g.fillStyle = sg
       g.beginPath()
       g.arc(0, 0, M(k.rz), 0, Math.PI * 2)
@@ -175,9 +175,9 @@ function paintSplat() {
   g.translate(X(POND.x), Z(POND.z))
   g.scale(POND.rx / POND.rz, 1)
   const pg = g.createRadialGradient(0, 0, M(POND.rz * 0.9), 0, 0, M(POND.rz * 1.35))
-  pg.addColorStop(0, '#4c4630')
-  pg.addColorStop(0.5, '#56562f')
-  pg.addColorStop(1, 'rgba(62,95,39,0)')
+  pg.addColorStop(0, '#e8d493')
+  pg.addColorStop(0.45, '#c9c078')
+  pg.addColorStop(1, 'rgba(90,148,39,0)')
   g.fillStyle = pg
   g.beginPath()
   g.arc(0, 0, M(POND.rz * 1.35), 0, Math.PI * 2)
@@ -209,8 +209,8 @@ function withDetail(mat: THREE.MeshStandardMaterial, detail: THREE.Texture) {
         float mid = texture2D(uDetail, vWPos.xz * 0.11).g;
         float macro = texture2D(uDetail, vWPos.xz * 0.012).b;
         float fineK = 1.0 - smoothstep(8.0, 60.0, dist);
-        diffuseColor.rgb *= mix(1.0, 0.45 + fine * 1.1, 0.85 * fineK);
-        diffuseColor.rgb *= 0.8 + mid * 0.4;
+        diffuseColor.rgb *= mix(1.0, 0.55 + fine * 0.9, 0.7 * fineK);
+        diffuseColor.rgb *= 0.86 + mid * 0.28;
         diffuseColor.rgb *= 0.86 + macro * 0.28;`,
       )
   }
@@ -257,7 +257,7 @@ export class Terrain {
       op.setY(i, heightAt(x, z) - (inside ? 0.6 : 0.05))
     }
     og.computeVertexNormals()
-    const omat = new THREE.MeshStandardMaterial({ color: 0x34561d, roughness: 0.95 })
+    const omat = new THREE.MeshStandardMaterial({ color: 0x5a9427, roughness: 0.95 })
     withDetail(omat, detail)
     const outer = new THREE.Mesh(og, omat)
     outer.receiveShadow = true
@@ -272,9 +272,9 @@ export class Terrain {
         {
           uTime: { value: 0 },
           uSun: { value: sunDir.clone() },
-          uDeep: { value: new THREE.Color(0x1d3a36) },
-          uHorizon: { value: new THREE.Color(0xc7d8e4) },
-          uZenith: { value: new THREE.Color(0x4a7fb8) },
+          uDeep: { value: new THREE.Color(0x0f7f95) },
+          uHorizon: { value: new THREE.Color(0xc6f3ff) },
+          uZenith: { value: new THREE.Color(0x1fa9f2) },
         },
       ]),
       vertexShader: `

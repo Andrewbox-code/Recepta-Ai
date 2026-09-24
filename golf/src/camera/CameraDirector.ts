@@ -18,7 +18,8 @@ export class CameraDirector {
   private shakeAmt = 0
   private modeT = 0
   private fov = 50
-  private hold = false // stay put and just watch (putting)
+  private hold = false
+  fovScale = 1 // wider on portrait screens // stay put and just watch (putting)
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.05, 4000)
@@ -35,7 +36,7 @@ export class CameraDirector {
     const f = this.fwd(aim)
     if (putting) {
       // Crouched behind the ball reading the line.
-      this.goalPos.copy(ball).addScaledVector(f, -1.9).add(new THREE.Vector3(0, 0.75, 0))
+      this.goalPos.copy(ball).addScaledVector(f, -1.6).add(new THREE.Vector3(0, 0.95, 0))
       this.goalLook.copy(ball).addScaledVector(f, 9).add(new THREE.Vector3(0, -1.4, 0))
       this.fov = 45
       if (snap) {
@@ -45,13 +46,22 @@ export class CameraDirector {
       return
     }
     // Behind the ball, looking down the range: ball low in frame, targets visible.
-    this.goalPos.copy(ball).addScaledVector(f, -3.1).add(new THREE.Vector3(0, 1.45, 0))
-    this.goalLook.copy(ball).addScaledVector(f, 40).add(new THREE.Vector3(0, -6.5, 0))
+    this.goalPos.copy(ball).addScaledVector(f, -1.55).add(new THREE.Vector3(0.1, 0.66, 0))
+    this.goalLook.copy(ball).addScaledVector(f, 30).add(new THREE.Vector3(0, -3.7, 0))
     this.fov = 50
     if (snap) {
       this.pos.copy(this.goalPos)
       this.look.copy(this.goalLook)
     }
+  }
+
+  // Any fixed vantage point (overview map, look at the target).
+  view(pos: THREE.Vector3, look: THREE.Vector3) {
+    this.mode = 'lie'
+    this.modeT = 0
+    this.goalPos.copy(pos)
+    this.goalLook.copy(look)
+    this.fov = 50
   }
 
   lieCheck(ball: THREE.Vector3, aim: number) {
@@ -154,7 +164,7 @@ export class CameraDirector {
     }
     if (this.style === 'tracer' && (this.mode === 'chase' || this.mode === 'landing')) this.mode = 'launch'
 
-    this.camera.fov += (this.fov - this.camera.fov) * damp(3, dt)
+    this.camera.fov += (Math.min(80, this.fov * this.fovScale) - this.camera.fov) * damp(3, dt)
     this.camera.updateProjectionMatrix()
     this.camera.position.copy(this.pos)
     this.shakeAmt *= Math.exp(-dt * 6)

@@ -86,14 +86,14 @@ export function heightAt(x: number, z: number): number {
   // Shoulder mounds just off the fairway, then rolling hills.
   const n1 = fbm(x * 0.018 + 3.1, z * 0.018)
   h += sstep(FAIRWAY_HALF + 4, FAIRWAY_HALF + 38, ax) * (1.2 + 4.5 * n1)
-  h += sstep(80, 420, ax) * 38 * fbm(x * 0.004 + 9, z * 0.004 + 2)
-  // Hill closing off the end of the range.
-  h += sstep(-RANGE_LEN - 25, -RANGE_LEN - 190, z) * (10 + 30 * fbm(x * 0.006, z * 0.006 + 5))
+  h += sstep(80, 420, ax) * 16 * fbm(x * 0.004 + 9, z * 0.004 + 2)
+  // Rolling dunes closing off the end of the range.
+  h += sstep(-RANGE_LEN - 25, -RANGE_LEN - 190, z) * (5 + 12 * fbm(x * 0.006, z * 0.006 + 5))
   // Gentle rise behind the tee.
-  h += sstep(25, 140, z) * (5 + 6 * n1)
-  // Far ridge line for the horizon.
-  const d = Math.hypot(x, z + 250)
-  h += sstep(700, 1700, d) * 160 * fbm(x * 0.0015 + 20, z * 0.0015)
+  h += sstep(25, 140, z) * (4 + 4 * n1)
+  // The island falls away into the sea beyond.
+  const d = Math.hypot(x * 0.8, z + 220)
+  h = h * (1 - sstep(650, 1000, d)) - sstep(800, 1300, d) * 25
 
   for (const t of TARGETS) {
     const cz = -t.yd * YD
