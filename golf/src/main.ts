@@ -110,6 +110,7 @@ class Game {
   grass: Grass[] = []
   stock: Record<string, number> = {}
   freshPutt = false
+  pendingClub: Club | null = null
   club3d!: Club3D
   puttGrid!: PuttGrid
   view: 'play' | 'map' | 'eye' = 'play'
@@ -165,7 +166,6 @@ class Game {
         if (s.phase !== 'idle') {
           if (this.view !== 'play') this.setView('play')
           $('data').classList.add('hidden')
-          $('bagPop').classList.add('hidden')
           $('liePop').classList.add('hidden')
           const last = s.points[s.points.length - 1]
           this.club3d.setSwing((last.y - s.origin.y) / s.unit)
@@ -234,6 +234,11 @@ class Game {
     this.aimLine.visible = true
     this.tracer.opacity = 0.35
     $('hint').classList.toggle('fade', this.swung)
+    if (this.pendingClub) {
+      const c = this.pendingClub
+      this.pendingClub = null
+      this.setClub(c)
+    }
   }
 
   onCancel(why: string) {
@@ -263,6 +268,7 @@ class Game {
     const holed = this.checkHoled(result)
     this.shot = { launch, result, metrics: m, club: this.club, t: 0, idx: 0, bounce: 0, landed: false, holed }
     this.state = 'flight'
+    $('hud').classList.add('inflight')
     this.aimLine.visible = false
     this.tracer.reset()
     this.tracer.opacity = 1
@@ -445,6 +451,7 @@ class Game {
   }
 
   private finishShot() {
+    $('hud').classList.remove('inflight')
     const s = this.shot!
     const r = s.result
     this.state = 'rest'
@@ -465,12 +472,10 @@ class Game {
     // Score cards: last carry and closest-to-pin (or putts holed).
     const pinDist = Math.hypot(rest.x - this.lastPin.x, rest.z - this.lastPin.z)
     if (s.club.putter) {
-      $('scoreBig').textContent = s.holed ? 'IN' : `${(pinDist / 0.3048).toFixed(1)}′`
-      $('scoreSmall').textContent = s.holed ? 'holed' : 'left'
+      $('scoreBig').textContent = s.holed ? 'Holed' : `${(pinDist / 0.3048).toFixed(1)} ft`
       if (s.holed) this.holed++
     } else if (s.launch.contact !== 'whiff' && r.restSurface !== 'water') {
-      $('scoreBig').textContent = `${Math.round(yd(r.carry))}`
-      $('scoreSmall').textContent = 'last carry'
+      $('scoreBig').textContent = `${Math.round(yd(r.carry))} yds`
       this.bestProx = Math.min(this.bestProx, yd(pinDist))
     }
     if (s.launch.contact !== 'whiff') {
@@ -523,15 +528,17 @@ class Game {
     document.querySelectorAll<HTMLButtonElement>('#windBtns button').forEach((b) => b.classList.toggle('on', +b.dataset.wind! === level))
   }
 
+  // Pick a club any time. Mid-shot, it's queued and in your hands for the next one.
   setClub(c: Club) {
-    if (this.state !== 'address') return
+    this.showClub(c)
+    if (this.state !== 'address') {
+      this.pendingClub = c
+      $('clubMeta').textContent = `${$('clubMeta').textContent} · next shot`
+      return
+    }
+    this.pendingClub = null
     const wasPutter = this.club.putter
     this.club = c
-    document.querySelectorAll<HTMLButtonElement>('#clubs button').forEach((b) => b.classList.toggle('on', b.dataset.club === c.id))
-    $('clubName').textContent = c.name
-    $('clubMeta').textContent = c.putter ? 'Practice green' : `${c.loft}° · ${Math.round(this.stock[c.id] ?? 0)} yd carry`
-    $('clubShort').textContent = c.putter ? 'P' : c.short
-    $('clubSub').textContent = c.putter ? 'putt' : `${Math.round(this.stock[c.id] ?? 0)}y`
     this.club3d.setClub(c)
     if (wasPutter !== !!c.putter) {
       this.shotCount = 0
@@ -556,8 +563,15 @@ class Game {
     if (wasPutter) this.cam.address(this.ball.mesh.position, this.aim, true)
   }
 
+  showClub(c: Club) {
+    document.querySelectorAll<HTMLButtonElement>('#clubs button').forEach((b) => b.classList.toggle('on', b.dataset.club === c.id))
+    document.querySelector('#clubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    $('clubName').textContent = c.name
+    $('clubMeta').textContent = c.putter ? 'Practice green' : `${c.loft}° loft · ${Math.round(this.stock[c.id] ?? 0)} yds carry`
+  }
+
   cycleClub(dir: number) {
-    const i = CLUBS.indexOf(this.club)
+    const i = CLUBS.indexOf(this.pendingClub ?? this.club)
     this.setClub(CLUBS[(i + dir + CLUBS.length) % CLUBS.length])
   }
 
@@ -576,8 +590,7 @@ class Game {
     this.baseAim = Math.atan2(PRACTICE.cup.x - x, -(PRACTICE.cup.z - z))
     this.aim = this.baseAim
     this.lie = LIES.green
-    $('clubMeta').textContent = `Practice green · ${Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z).toFixed(1)} m to the cup`
-    $('clubSub').textContent = `${Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z).toFixed(1)}m`
+    $('clubMeta').textContent = `Practice green · ${(Math.hypot(PRACTICE.cup.x - x, PRACTICE.cup.z - z) / 0.3048).toFixed(0)} ft putt`
     this.reset(true)
     this.nudgeAim(0)
   }
@@ -605,13 +618,11 @@ class Game {
     this.club3d.address(b, this.aim, this.range.groundY(b.x, b.z))
     if (this.club.putter) this.puttGrid.show(b, new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z))
     else this.puttGrid.hide()
-    const lieCard = $('lieIco')
-    lieCard.className = `ico lie-${this.lie.id}`
+    $('lieIco').className = `lie-dot lie-${this.lie.id}`
     $('lieName').textContent = this.lie.id === 'sand' ? 'Bunker' : this.lie.name
-    $('holeL1').textContent = this.club.putter ? 'Practice' : 'Driving'
-    $('holeL2').textContent = this.club.putter ? 'Green' : 'Range'
-    $('holeL3').textContent = `${this.club.putter ? 'Putt' : 'Shot'} ${this.shotCount + 1}`
-    $('bestText').textContent = this.club.putter ? `${this.holed} holed` : Number.isFinite(this.bestProx) ? `${this.bestProx.toFixed(1)} yds` : 'Closest —'
+    $('holeL1').textContent = this.club.putter ? 'Practice Green' : 'Driving Range'
+    $('holeL3').textContent = `${this.shotCount + 1}`
+    $('bestText').textContent = this.club.putter ? `${this.holed} holed` : Number.isFinite(this.bestProx) ? `${this.bestProx.toFixed(1)} yds` : '—'
     this.updatePin()
   }
 
@@ -642,7 +653,9 @@ class Game {
     const d = Math.hypot(pin.x - b.x, pin.z - b.z)
     const dy = yd(this.range.groundY(pin.x, pin.z) - this.range.groundY(b.x, b.z))
     const elev = `${dy >= 0 ? '+' : '−'}${Math.abs(dy).toFixed(1)}`
-    $('pinDist').textContent = this.club.putter ? `${(d / 0.3048).toFixed(1)} ft` : `${yd(d).toFixed(0)} yds (${elev})`
+    $('pinDist').textContent = this.club.putter ? `${(d / 0.3048).toFixed(1)}` : `${yd(d).toFixed(0)}`
+    $('pinUnit').textContent = this.club.putter ? 'ft' : 'yds'
+    $('pinElev').textContent = `Elevation ${elev} yds`
   }
 
   // Overview map / look-at-the-target views, only while addressing the ball.
@@ -669,7 +682,6 @@ class Game {
 
   buildHud() {
     $('clubs').innerHTML = CLUBS.map((c) => `<button data-club="${c.id}" title="${c.name}">${c.short}</button>`).join('')
-    $('clubBtn').addEventListener('click', () => $('bagPop').classList.toggle('hidden'))
     $('lieCard').addEventListener('click', () => {
       if (!this.club.putter) $('liePop').classList.toggle('hidden')
     })
@@ -687,7 +699,6 @@ class Game {
     $('clubs').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).dataset.club
       if (id) this.setClub(CLUBS.find((c) => c.id === id)!)
-      $('bagPop').classList.add('hidden')
     })
     const lieIds: LieId[] = ['tee', 'fairway', 'rough', 'sand', 'hardpan']
     $('lies').innerHTML = lieIds.map((id) => `<button data-lie="${id}">${LIES[id].name}</button>`).join('')
@@ -771,7 +782,7 @@ class Game {
     this.cam.address(this.ball.mesh.position, this.aim, false, !!this.club.putter)
     this.refreshAddress()
     const d = Math.round(((this.aim - this.baseAim) * 180) / Math.PI * (this.club.putter ? 4 : 1)) / (this.club.putter ? 4 : 1)
-    $('aimText').textContent = d === 0 ? '0°' : `${Math.abs(d)}°${d > 0 ? 'R' : 'L'}`
+    $('aimText').textContent = d === 0 ? 'Aim 0°' : `Aim ${Math.abs(d)}° ${d > 0 ? 'R' : 'L'}`
   }
 
   showLaunch(l: Launch) {

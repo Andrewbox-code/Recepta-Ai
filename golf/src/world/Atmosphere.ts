@@ -1,11 +1,11 @@
 import * as THREE from 'three'
 
-// Bright tropical day: saturated cyan sky, a few fair-weather clouds, sea on
-// the horizon, strong warm sun with soft shadows that follow the action.
+// Clear tournament-day sky: deep blue overhead fading to a pale hazy
+// horizon, shaded cumulus, warm sun with crisp shadows that follow the action.
 
-const SKY_TOP = new THREE.Color(0x1fa9f2)
-const SKY_MID = new THREE.Color(0x49d0fb)
-const SKY_HORIZON = new THREE.Color(0xc6f3ff)
+const SKY_TOP = new THREE.Color(0x2d6fc0)
+const SKY_MID = new THREE.Color(0x5d98d8)
+const SKY_HORIZON = new THREE.Color(0xc9dcec)
 
 function skyMaterial(sunDir: THREE.Vector3, withClouds: boolean) {
   return new THREE.ShaderMaterial({
@@ -33,14 +33,19 @@ function skyMaterial(sunDir: THREE.Vector3, withClouds: boolean) {
         col = mix(col, uTop, smoothstep(0.1, 0.6, y));
         if (y < 0.0) col = uHor;
         float sd = max(dot(vDir, uSun), 0.0);
-        col += vec3(1.0, 0.96, 0.85) * (pow(sd, 900.0) * 4.0 + pow(sd, 60.0) * 0.25 + pow(sd, 6.0) * 0.08);
+        col += vec3(1.0, 0.96, 0.88) * (pow(sd, 1200.0) * 4.0 + pow(sd, 80.0) * 0.2 + pow(sd, 5.0) * 0.1);
         if (uClouds > 0.5 && y > 0.02) {
-          vec2 p = vDir.xz / (y + 0.1) * 1.3 + uDrift;
+          vec2 p = vDir.xz / (y + 0.08) * 1.1 + uDrift;
           float c = fbm(p);
-          float cov = smoothstep(0.62, 0.82, c) * smoothstep(0.03, 0.3, y);
-          float shade = smoothstep(0.6, 0.95, fbm(p * 1.4 + 3.0));
-          vec3 cc = mix(vec3(1.0), vec3(0.8, 0.88, 0.95), shade * 0.6);
-          col = mix(col, cc, cov * 0.92);
+          float cov = smoothstep(0.58, 0.8, c) * smoothstep(0.02, 0.25, y);
+          // Cumulus: bright sunlit tops, grey-blue flat bases.
+          float thick = smoothstep(0.58, 0.9, c);
+          float lit = fbm(p + uSun.xz * 0.35);
+          float sunSide = clamp((c - lit) * 3.0 + 0.6, 0.0, 1.0);
+          vec3 cc = mix(vec3(0.66, 0.71, 0.79), vec3(1.0, 0.99, 0.96), sunSide);
+          cc = mix(cc, vec3(0.58, 0.63, 0.72), thick * 0.35 * (1.0 - sunSide));
+          cc = mix(cc, uHor, smoothstep(0.25, 0.02, y) * 0.6);
+          col = mix(col, cc, cov * 0.95);
         }
         // Untonemapped on purpose: the sky should be exactly this bright cyan.
         gl_FragColor = vec4(col, 1.0);
@@ -54,7 +59,6 @@ export class Atmosphere {
   sun: THREE.DirectionalLight
   private sky: THREE.Mesh
   private skyMat: THREE.ShaderMaterial
-  private seaMat: THREE.ShaderMaterial
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, shadows: boolean) {
     const elevation = 48
@@ -72,20 +76,20 @@ export class Atmosphere {
     const pm = new THREE.PMREMGenerator(renderer)
     const envScene = new THREE.Scene()
     envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), skyMaterial(this.sunDir, false)))
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x5f8f2c }))
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x3f6a26 }))
     ground.position.y = -2
     envScene.add(ground)
     scene.environment = pm.fromScene(envScene, 0.04).texture
-    scene.environmentIntensity = 0.55
+    scene.environmentIntensity = 0.5
     pm.dispose()
 
-    this.sun = new THREE.DirectionalLight(0xfff4e0, 3.4)
+    this.sun = new THREE.DirectionalLight(0xfff1dc, 3.3)
     if (shadows) {
       this.sun.castShadow = true
-      this.sun.shadow.mapSize.set(2048, 2048)
+      this.sun.shadow.mapSize.set(4096, 4096)
       const c = this.sun.shadow.camera
-      c.left = c.bottom = -38
-      c.right = c.top = 38
+      c.left = c.bottom = -45
+      c.right = c.top = 45
       c.near = 10
       c.far = 400
       this.sun.shadow.bias = -0.0003
@@ -93,45 +97,10 @@ export class Atmosphere {
       this.sun.shadow.radius = 3
     }
     scene.add(this.sun, this.sun.target)
-    scene.add(new THREE.HemisphereLight(0xbff0ff, 0x6d8f35, 0.35))
-    scene.fog = new THREE.FogExp2(0xbdefff, 0.00055)
+    scene.add(new THREE.HemisphereLight(0xc4dcf2, 0x4a6a2c, 0.3))
+    // Aerial perspective: distant hills fade to the horizon haze.
+    scene.fog = new THREE.FogExp2(0xc4d8ea, 0.0011)
 
-    // Tropical sea out to the horizon, below the course.
-    this.seaMat = new THREE.ShaderMaterial({
-      fog: true,
-      uniforms: THREE.UniformsUtils.merge([
-        THREE.UniformsLib.fog,
-        { uTime: { value: 0 }, uSun: { value: this.sunDir }, uDeep: { value: new THREE.Color(0x0a8fb8) }, uShallow: { value: new THREE.Color(0x3fe0e0) }, uSky: { value: SKY_HORIZON } },
-      ]),
-      vertexShader: `
-        #include <fog_pars_vertex>
-        varying vec3 vW;
-        void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;
-          #include <fog_vertex>
-        }`,
-      fragmentShader: `
-        #include <fog_pars_fragment>
-        uniform float uTime; uniform vec3 uSun, uDeep, uShallow, uSky; varying vec3 vW;
-        void main(){
-          vec2 p = vW.xz * 0.05; float t = uTime * 0.6;
-          vec2 g = vec2(sin(p.x*3.0 + t) + sin(p.x*7.1 + p.y*3.3 + t*1.7)*0.5, cos(p.y*2.7 - t) + cos(p.y*6.3 - p.x*2.9 + t*1.3)*0.5) * 0.05;
-          vec3 nrm = normalize(vec3(g.x, 1.0, g.y));
-          vec3 V = normalize(cameraPosition - vW);
-          float fres = 0.02 + 0.98 * pow(1.0 - max(dot(nrm, V), 0.0), 5.0);
-          float d = length(vW.xz);
-          vec3 col = mix(uShallow, uDeep, smoothstep(700.0, 1800.0, d));
-          col = mix(col, uSky, fres * 0.8);
-          vec3 R = reflect(-V, nrm);
-          col += vec3(1.0, 0.95, 0.85) * pow(max(dot(R, uSun), 0.0), 250.0) * 2.0;
-          gl_FragColor = vec4(col, 1.0);
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-          #include <fog_fragment>
-        }`,
-    })
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2), this.seaMat)
-    sea.position.y = -3
-    scene.add(sea)
   }
 
   follow(focus: THREE.Vector3) {
@@ -141,7 +110,7 @@ export class Atmosphere {
 
   update(t: number, wind: THREE.Vector2, cam: THREE.Camera) {
     this.skyMat.uniforms.uDrift.value.addScaledVector(wind, 0.0004)
-    this.seaMat.uniforms.uTime.value = t
+    void t
     this.sky.position.copy(cam.position)
   }
 }

@@ -19,11 +19,11 @@ export class PuttGrid {
         void main(){
           vec2 p = vW.xz;
           vec2 g = abs(fract(p - 0.5) - 0.5) / fwidth(p);
-          float line = 1.0 - min(min(g.x, g.y) * 0.7, 1.0);
+          float line = 1.0 - min(min(g.x, g.y) * 1.1, 1.0);
           float d = length(p - uCenter) / uRadius;
           float edge = 1.0 - smoothstep(0.6, 1.0, d);
-          float pulse = 0.75 + 0.25 * sin(uTime * 2.0 - d * 6.0);
-          gl_FragColor = vec4(vec3(0.38, 1.0, 0.35) * 1.2, line * edge * pulse * uAlpha * 0.85);
+          float pulse = 0.85 + 0.15 * sin(uTime * 1.5 - d * 5.0);
+          gl_FragColor = vec4(vec3(1.0), line * edge * pulse * uAlpha * 0.45);
         }`,
     })
     const geo = new THREE.PlaneGeometry(1, 1, 48, 48).rotateX(-Math.PI / 2)

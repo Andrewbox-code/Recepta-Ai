@@ -15,31 +15,38 @@ function mulberry(seed: number) {
 }
 
 function leafTexture(needles: boolean) {
-  const n = 256
+  const n = 512
   const c = document.createElement('canvas')
   c.width = c.height = n
   const g = c.getContext('2d')!
   const rnd = mulberry(needles ? 7 : 3)
-  const count = needles ? 420 : 260
+  const count = needles ? 1700 : 1300
   for (let i = 0; i < count; i++) {
     const r = Math.sqrt(rnd()) * n * 0.46
     const a = rnd() * Math.PI * 2
     const x = n / 2 + Math.cos(a) * r
     const y = n / 2 + Math.sin(a) * r * (needles ? 0.55 : 1)
-    const light = 45 + rnd() * 55
-    g.fillStyle = `hsl(${needles ? 115 + rnd() * 25 : 80 + rnd() * 30}, ${needles ? 35 : 45 + rnd() * 15}%, ${light * (0.55 + (1 - r / (n * 0.46)) * 0.45)}%)`
+    const light = 30 + rnd() * 38
+    g.fillStyle = `hsl(${needles ? 120 + rnd() * 25 : 78 + rnd() * 34}, ${needles ? 28 + rnd() * 10 : 34 + rnd() * 18}%, ${light * (0.55 + (1 - r / (n * 0.46)) * 0.45)}%)`
     g.save()
     g.translate(x, y)
     g.rotate(needles ? rnd() * 0.6 - 0.3 + Math.PI / 2 : rnd() * Math.PI * 2)
     g.beginPath()
-    if (needles) g.ellipse(0, 0, 1.1, 9 + rnd() * 6, 0, 0, Math.PI * 2)
-    else g.ellipse(0, 0, 4 + rnd() * 3, 7 + rnd() * 4, 0, 0, Math.PI * 2)
+    if (needles) g.ellipse(0, 0, 2.2, 18 + rnd() * 12, 0, 0, Math.PI * 2)
+    else {
+      // Pointed leaf with a midrib.
+      const w = 8 + rnd() * 6
+      const l = 16 + rnd() * 10
+      g.moveTo(0, -l)
+      g.quadraticCurveTo(w, 0, 0, l)
+      g.quadraticCurveTo(-w, 0, 0, -l)
+    }
     g.fill()
     g.restore()
   }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 4
+  t.anisotropy = 16
   return t
 }
 
@@ -113,141 +120,6 @@ function trunk(rnd: () => number, h: number, r: number, branches: number) {
   return mergeGeometries(parts.map((p) => p.toNonIndexed()))!
 }
 
-function palmBarkTexture() {
-  const c = document.createElement('canvas')
-  c.width = 256
-  c.height = 32
-  const g = c.getContext('2d')!
-  g.fillStyle = '#8a6a48'
-  g.fillRect(0, 0, 256, 32)
-  for (let x = 0; x < 256; x += 16) {
-    g.fillStyle = 'rgba(60,42,26,0.8)'
-    g.fillRect(x, 0, 3, 32)
-    g.fillStyle = 'rgba(170,140,100,0.5)'
-    g.fillRect(x + 4, 0, 6, 32)
-  }
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.repeat.set(10, 1)
-  return t
-}
-
-function frondTexture() {
-  const W = 128
-  const H = 512
-  const c = document.createElement('canvas')
-  c.width = W
-  c.height = H
-  const g = c.getContext('2d')!
-  const rnd = mulberry(11)
-  // Leaflets fan out from the rib, longest mid-frond; v=0 at the base.
-  for (let y = 12; y < H - 6; y += 5) {
-    const s = y / H
-    const len = (W / 2 - 4) * Math.sin(Math.PI * Math.min(1, s * 1.15)) * (0.85 + rnd() * 0.15)
-    for (const side of [-1, 1]) {
-      const l = 52 + rnd() * 40
-      g.strokeStyle = `hsl(${88 + rnd() * 20}, ${60 + rnd() * 15}%, ${l * 0.55}%)`
-      g.lineWidth = 3.2
-      g.beginPath()
-      g.moveTo(W / 2, y)
-      g.quadraticCurveTo(W / 2 + side * len * 0.6, y + 10, W / 2 + side * len, y + 26)
-      g.stroke()
-    }
-  }
-  g.strokeStyle = '#6f8f2a'
-  g.lineWidth = 4
-  g.beginPath()
-  g.moveTo(W / 2, 0)
-  g.lineTo(W / 2, H)
-  g.stroke()
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 4
-  t.flipY = false
-  return t
-}
-
-// A curved, tapering palm trunk plus coconuts; returns the crown position too.
-function palmTrunk(rnd: () => number, h: number, lean: number) {
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(lean * 0.15, h * 0.35, 0),
-    new THREE.Vector3(lean * 0.55, h * 0.7, 0),
-    new THREE.Vector3(lean, h, 0),
-  ])
-  const tubular = 10
-  const radial = 6
-  const geo = new THREE.TubeGeometry(curve, tubular, 0.2, radial, false)
-  const pos = geo.attributes.position
-  for (let i = 0; i <= tubular; i++) {
-    const t = i / tubular
-    const c = curve.getPointAt(t)
-    const k = 1.25 - 0.55 * t + (t < 0.05 ? 0.4 * (1 - t / 0.05) : 0) // flared base
-    for (let j = 0; j <= radial; j++) {
-      const idx = i * (radial + 1) + j
-      pos.setXYZ(idx, c.x + (pos.getX(idx) - c.x) * k, c.y + (pos.getY(idx) - c.y) * k, c.z + (pos.getZ(idx) - c.z) * k)
-    }
-  }
-  geo.computeVertexNormals()
-  const top = curve.getPointAt(1)
-  const parts: THREE.BufferGeometry[] = [geo.toNonIndexed()]
-  for (let i = 0; i < 3; i++) {
-    const a = rnd() * Math.PI * 2
-    const nut = new THREE.SphereGeometry(0.16, 6, 4)
-    nut.translate(top.x + Math.cos(a) * 0.22, top.y - 0.25 - rnd() * 0.1, top.z + Math.sin(a) * 0.22)
-    // Coconuts sample a dark part of the bark texture.
-    const uv = nut.attributes.uv
-    for (let k = 0; k < uv.count; k++) uv.setXY(k, 0.005, 0.5)
-    parts.push(nut.toNonIndexed())
-  }
-  return { geo: mergeGeometries(parts)!, top }
-}
-
-function palmCrown(rnd: () => number, top: THREE.Vector3, fronds: number, len: number) {
-  const out: THREE.BufferGeometry[] = []
-  for (let f = 0; f < fronds; f++) {
-    const yaw = (f / fronds) * Math.PI * 2 + rnd() * 0.4
-    const lift = 0.9 - rnd() * 0.5 - (f % 3 === 0 ? 0.6 : 0) // some hang lower
-    const droop = 1.7 + rnd() * 0.6
-    const width = 1.5 + rnd() * 0.3
-    const segs = 6
-    const geo = new THREE.PlaneGeometry(width, len, 2, segs)
-    const pos = geo.attributes.position
-    const uv = geo.attributes.uv
-    // Centreline in the frond's own vertical plane.
-    const pts: THREE.Vector2[] = [new THREE.Vector2(0, 0)]
-    for (let i = 1; i <= segs; i++) {
-      const s = i / segs
-      const ang = lift - droop * s * s
-      const p = pts[i - 1]
-      pts.push(new THREE.Vector2(p.x + Math.cos(ang) * (len / segs), p.y + Math.sin(ang) * (len / segs)))
-    }
-    const cols: number[] = []
-    for (let k = 0; k < pos.count; k++) {
-      const s = uv.getY(k) // 0 = base (flip below), 1 = tip
-      const sb = 1 - s
-      const x = pos.getX(k)
-      const i = Math.min(segs, Math.round(sb * segs))
-      const c = pts[i]
-      // Leaflets fold down into a shallow V.
-      const fold = -Math.abs(x) * 0.45
-      pos.setXYZ(k, c.x, c.y + fold, x)
-      uv.setY(k, sb)
-      const shade = 0.7 + 0.3 * sb
-      cols.push(shade, shade, shade)
-    }
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
-    geo.rotateY(yaw)
-    geo.translate(top.x, top.y, top.z)
-    // Soft upward normals: light the crown like a canopy, not paper.
-    const n = geo.attributes.normal
-    for (let k = 0; k < n.count; k++) n.setXYZ(k, 0, 1, 0)
-    out.push(geo)
-  }
-  return mergeGeometries(out)!
-}
-
 interface Species {
   crown: THREE.InstancedMesh
   wood: THREE.InstancedMesh
@@ -258,10 +130,13 @@ export class Trees {
   private species: Species[] = []
   private d = new THREE.Object3D()
 
-  constructor(scene: THREE.Scene, shadows: boolean) {
+  constructor(scene: THREE.Scene, shadows: boolean, smoothEdges: boolean) {
     const rnd = mulberry(42)
     const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture(false), alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 })
+    const needleMat = new THREE.MeshStandardMaterial({ map: leafTexture(true), alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.9 })
     const barkMat = new THREE.MeshStandardMaterial({ map: barkTexture(), roughness: 1 })
+    // Smooth, un-jagged foliage edges with MSAA.
+    leafMat.alphaToCoverage = needleMat.alphaToCoverage = smoothEdges
 
     const kinds: { crown: THREE.BufferGeometry; wood: THREE.BufferGeometry; mat: THREE.Material; pine: boolean; bark?: THREE.Material }[] = []
     // Broadleaf variants: oak-ish, round, tall.
@@ -272,16 +147,19 @@ export class Trees {
     ]) {
       kinds.push({ crown: canopy(rnd, { cards: v.cards, rx: v.rx, ry: v.ry, cy: v.cy, size: 2.6, tint: 0.92 }), wood: trunk(rnd, v.h + v.ry * 0.6, v.r, 5), mat: leafMat, pine: false })
     }
-    // Palms: curved trunks, arching fronds.
-    const frondMat = new THREE.MeshStandardMaterial({ map: frondTexture(), alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.75 })
-    const palmBark = new THREE.MeshStandardMaterial({ map: palmBarkTexture(), roughness: 0.95 })
+    // Conifers: stacked tiers of drooping needle cards.
     for (const v of [
-      { h: 9.5, lean: 2.2, fronds: 11, len: 3.6 },
-      { h: 7, lean: 1.1, fronds: 10, len: 3.2 },
-      { h: 11.5, lean: 3.6, fronds: 12, len: 3.9 },
+      { h: 15, w: 3.3 },
+      { h: 11, w: 2.6 },
     ]) {
-      const t = palmTrunk(rnd, v.h, v.lean)
-      kinds.push({ crown: palmCrown(rnd, t.top, v.fronds, v.len), wood: t.geo, mat: frondMat, pine: true, bark: palmBark })
+      const tiers: THREE.BufferGeometry[] = []
+      const nt = 9
+      for (let i = 0; i < nt; i++) {
+        const y = 2 + (i / nt) * (v.h - 2.5)
+        const w = v.w * (1 - i / nt) + 0.4
+        tiers.push(canopy(rnd, { cards: 18, rx: w, ry: 0.75, cy: y, size: w * 0.9 + 0.7, tint: 0.85 }))
+      }
+      kinds.push({ crown: mergeGeometries(tiers)!, wood: trunk(rnd, v.h, 0.3, 0), mat: needleMat, pine: true })
     }
 
     // Placement: tree lines hugging the range, groves on the mounds, a dense
@@ -320,9 +198,9 @@ export class Trees {
     for (const [si, sp] of spots.entries()) {
       // Performance mode: thin out the trees well away from the range.
       if (!shadows && si % 5 < 2 && (Math.abs(sp.x) > 75 || sp.z < -RANGE_LEN)) continue
-      // Palms line the range; broadleaf fills in behind them.
-      const palmBias = Math.abs(sp.x) < 80 && sp.z > -RANGE_LEN ? 0.75 : 0.4
-      const k = rnd() < palmBias ? 3 + Math.floor(rnd() * 3) : Math.floor(rnd() * 3)
+      // Parkland: mostly hardwoods near the range, more pines on the hills.
+      const pineBias = sp.z < -RANGE_LEN || Math.abs(sp.x) > 90 ? 0.5 : 0.22
+      const k = rnd() < pineBias ? 3 + Math.floor(rnd() * 2) : Math.floor(rnd() * 3)
       buckets[k].push({ x: sp.x, y: heightAt(sp.x, sp.z) - 0.2, z: sp.z, s: sp.s, rot: rnd() * Math.PI * 2, phase: rnd() * 10 })
     }
 
@@ -334,8 +212,8 @@ export class Trees {
       crown.castShadow = wood.castShadow = shadows
       crown.receiveShadow = shadows
       items.forEach((_, j) => {
-        if (k.pine) tint.setHSL(0.2 + rnd() * 0.05, 0.55 + rnd() * 0.2, 0.62 + rnd() * 0.12)
-        else tint.setHSL(0.2 + rnd() * 0.07, 0.5 + rnd() * 0.25, 0.55 + rnd() * 0.14)
+        if (k.pine) tint.setHSL(0.34 + rnd() * 0.05, 0.25 + rnd() * 0.15, 0.55 + rnd() * 0.1)
+        else tint.setHSL(0.2 + rnd() * 0.08, 0.3 + rnd() * 0.25, 0.6 + rnd() * 0.15)
         crown.setColorAt(j, tint)
       })
       scene.add(crown, wood)

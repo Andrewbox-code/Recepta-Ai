@@ -7,7 +7,7 @@
     <title>Pure Strike — Range</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -15,71 +15,70 @@
     <canvas id="overlay"></canvas>
 
     <div id="hud">
-      <!-- Left: lie, pin, wind -->
-      <div class="cards left">
-        <button class="card" id="lieCard" aria-label="Change lie">
-          <span class="ico" id="lieIco"><svg viewBox="0 0 40 40"><rect x="4" y="24" width="32" height="10" rx="2" class="turf" /><circle cx="20" cy="16" r="9" fill="#fff" stroke="#c9d1d6" /></svg></span>
-          <span class="txt" id="lieName">Fairway</span>
-        </button>
-        <div class="card">
-          <span class="ico"><svg viewBox="0 0 40 40"><ellipse cx="20" cy="32" rx="14" ry="5" fill="#e0353a" /><ellipse cx="20" cy="32" rx="3" ry="1.3" fill="#fff" /><path d="M20 32 V6" stroke="#fff" stroke-width="2.4" /><path d="M20 6 L33 10 L20 15 Z" fill="#e0353a" /></svg></span>
-          <span class="txt" id="pinDist">— yds</span>
+      <!-- Bottom-left: the scorebug. Hole, stroke, distance, wind, lie. -->
+      <div class="bug" id="infoBox">
+        <div class="bug-head">
+          <span id="holeL1">Driving Range</span>
+          <span class="stroke">Stroke <b id="holeL3">1</b></span>
         </div>
-        <div class="card">
-          <span class="ico"><svg viewBox="-20 -20 40 40"><g id="windArrow"><path d="M0 14 V-12 M-7 -4 L0 -13 L7 -4" stroke="#3b5a2a" stroke-width="3.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
-          <span class="txt" id="windSpeed">0 mph</span>
-          <span class="sun"><svg viewBox="-12 -12 24 24"><circle r="4.6" fill="#1c2b36" /><g stroke="#1c2b36" stroke-width="1.8" stroke-linecap="round"><path d="M0 -10V-7.5M0 7.5V10M-10 0H-7.5M7.5 0H10M-7 -7L-5.3 -5.3M5.3 5.3L7 7M-7 7L-5.3 5.3M5.3 -5.3L7 -7" /></g></svg></span>
-          <span class="hidden" id="windDesc"></span>
+        <div class="bug-body">
+          <div class="bug-pin">
+            <div class="lbl">To pin</div>
+            <div class="val"><b id="pinDist">—</b><span id="pinUnit">yds</span></div>
+            <div class="sub" id="pinElev"></div>
+          </div>
+          <div class="bug-wind">
+            <div class="lbl">Wind</div>
+            <div class="wind-row">
+              <svg viewBox="-20 -20 40 40" class="wind-ico"><circle r="17" class="wring" /><g id="windArrow"><path d="M0 11 V-10 M-6 -3 L0 -11 L6 -3" /></g></svg>
+              <b id="windSpeed">0 mph</b>
+            </div>
+            <div class="sub" id="windDesc">calm</div>
+          </div>
+        </div>
+        <div class="bug-foot">
+          <button id="lieCard" aria-label="Change lie"><span id="lieIco" class="lie-dot"></span><span id="lieName">Fairway</span><span class="caret">▾</span></button>
+          <span class="stat">Last <b id="scoreBig">—</b></span>
+          <span class="stat">Best <b id="bestText">—</b></span>
         </div>
         <div class="pop hidden" id="liePop"><div class="row" id="lies"></div></div>
       </div>
 
-      <!-- Right: session / score -->
-      <div class="cards right">
-        <div class="duo">
-          <div class="green-card"><span id="holeL1">Driving</span><span id="holeL2">Range</span><span id="holeL3">Shot 1</span></div>
-          <div class="white-card"><b id="scoreBig">—</b><span id="scoreSmall">last carry</span></div>
-        </div>
-        <div class="duo slim">
-          <div class="green-card trophy"><svg viewBox="0 0 40 40"><path d="M12 6h16v8a8 8 0 0 1-16 0z" fill="#ffd23f" /><path d="M12 9H6a6 6 0 0 0 7 8M28 9h6a6 6 0 0 1-7 8" stroke="#ffd23f" stroke-width="2.5" fill="none" /><rect x="18" y="21" width="4" height="7" fill="#ffd23f" /><rect x="13" y="28" width="14" height="5" rx="1" fill="#ffd23f" /></svg></div>
-          <div class="white-card"><b id="bestText">—</b></div>
-        </div>
-        <div class="round-btns">
-          <button class="round" id="mapBtn" aria-label="Overview map"><svg viewBox="0 0 40 40"><path d="M6 10 L15 6 L25 10 L34 6 V30 L25 34 L15 30 L6 34 Z M15 6 V30 M25 10 V34" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" /></svg></button>
-          <button class="round" id="eyeBtn" aria-label="Look at target"><svg viewBox="0 0 40 40"><path d="M3 20 Q20 4 37 20 Q20 36 3 20 Z" fill="#fff" /><circle cx="20" cy="20" r="6.5" fill="none" stroke="#4c9b5a" stroke-width="2.6" /><circle cx="22" cy="18" r="1.6" fill="#4c9b5a" /></svg></button>
-          <div class="aim">
-            <button data-aim="-1" aria-label="Aim left">‹</button>
-            <span id="aimText">0°</span>
-            <button data-aim="1" aria-label="Aim right">›</button>
+      <!-- Bottom-right: club selection, always available. -->
+      <div class="bag" id="bagBox">
+        <div class="bag-strip" id="clubs"></div>
+        <div class="bag-main">
+          <button class="nav" id="clubPrev" aria-label="Previous club">‹</button>
+          <div class="bag-club">
+            <b id="clubName">7 Iron</b>
+            <span id="clubMeta"></span>
           </div>
+          <button class="nav" id="clubNext" aria-label="Next club">›</button>
         </div>
       </div>
 
-      <!-- Shot result, shown after each shot -->
-      <div class="shotcard hidden" id="data">
-        <div class="datagrid">
-          <div><label>Carry</label><b id="dCarry">—</b></div>
-          <div><label>Total</label><b id="dTotal">—</b></div>
-          <div><label>Offline</label><b id="dOffline">—</b></div>
-          <div><label>Apex</label><b id="dApex">—</b></div>
-          <div><label>Club</label><b id="dClub">—</b></div>
-          <div><label>Ball</label><b id="dBall">—</b></div>
-          <div><label>Launch</label><b id="dLaunch">—</b></div>
-          <div><label>Spin</label><b id="dSpin">—</b></div>
+      <!-- Bottom-right tools, above the bag. -->
+      <div class="tools">
+        <div class="aim">
+          <button data-aim="-1" aria-label="Aim left">‹</button>
+          <span id="aimText">Aim 0°</span>
+          <button data-aim="1" aria-label="Aim right">›</button>
         </div>
+        <button class="tool" id="eyeBtn" aria-label="Look at the target" title="Target view"><svg viewBox="0 0 40 40"><path d="M3 20 Q20 5 37 20 Q20 35 3 20 Z" fill="none" stroke="currentColor" stroke-width="2.6" /><circle cx="20" cy="20" r="5.5" fill="currentColor" /></svg></button>
+        <button class="tool" id="mapBtn" aria-label="Overview map" title="Overview"><svg viewBox="0 0 40 40"><path d="M6 10 L15 6 L25 10 L34 6 V30 L25 34 L15 30 L6 34 Z M15 6 V30 M25 10 V34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" /></svg></button>
+        <button class="tool" id="settingsBtn" aria-label="Settings" title="Settings"><svg viewBox="0 0 40 40"><path fill="currentColor" d="M17 3h6l1 5 4 2 4-3 4 4-3 4 2 4 5 1v6l-5 1-2 4 3 4-4 4-4-3-4 2-1 5h-6l-1-5-4-2-4 3-4-4 3-4-2-4-5-1v-6l5-1 2-4-3-4 4-4 4 3 4-2z" /><circle cx="20" cy="20" r="6" fill="#0f1c24" /></svg></button>
       </div>
 
-      <!-- Bottom: settings, club selector -->
-      <div class="bottom-bar">
-        <button class="gear" id="settingsBtn" aria-label="Settings"><svg viewBox="0 0 40 40"><path fill="#fff" d="M17 3h6l1 5 4 2 4-3 4 4-3 4 2 4 5 1v6l-5 1-2 4 3 4-4 4-4-3-4 2-1 5h-6l-1-5-4-2-4 3-4-4 3-4-2-4-5-1v-6l5-1 2-4-3-4 4-4 4 3 4-2z" /><circle cx="20" cy="20" r="6" fill="#a4cf5a" /></svg></button>
-        <button class="chev" id="clubPrev" aria-label="Previous club">‹</button>
-        <button class="clubball" id="clubBtn" aria-label="Choose club"><b id="clubShort">7i</b><span id="clubSub">174y</span></button>
-        <button class="chev" id="clubNext" aria-label="Next club">›</button>
-        <span class="gear-spacer"></span>
-      </div>
-      <div class="pop bag-pop hidden" id="bagPop">
-        <div class="bag-title"><b id="clubName">7 Iron</b><span id="clubMeta"></span></div>
-        <div class="bag-grid" id="clubs"></div>
+      <!-- Shot tracker, bottom-centre after each shot. -->
+      <div class="tracker hidden" id="data">
+        <div><label>Carry</label><b id="dCarry">—</b></div>
+        <div><label>Total</label><b id="dTotal">—</b></div>
+        <div><label>Offline</label><b id="dOffline">—</b></div>
+        <div><label>Apex</label><b id="dApex">—</b></div>
+        <div><label>Club spd</label><b id="dClub">—</b></div>
+        <div><label>Ball spd</label><b id="dBall">—</b></div>
+        <div><label>Launch</label><b id="dLaunch">—</b></div>
+        <div><label>Spin</label><b id="dSpin">—</b></div>
       </div>
 
       <div class="panel lab hidden" id="lab">

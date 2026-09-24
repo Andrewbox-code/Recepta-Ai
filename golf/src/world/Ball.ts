@@ -204,7 +204,7 @@ export class Ball {
     const d = camera.position.distanceTo(this.mesh.position)
     // Never smaller than ~3.5px on screen, like a broadcast ball.
     const radPerPx = (2 * Math.tan((camera.fov * Math.PI) / 360)) / viewH
-    const k = Math.max(1, (d * radPerPx * 5) / BALL.radius)
+    const k = Math.max(1, (d * radPerPx * 3.5) / BALL.radius)
     this.mesh.scale.setScalar(k)
     const h = this.mesh.position.y - groundY
     const s = BALL.radius * 3 * k * (1 + h * 0.05)

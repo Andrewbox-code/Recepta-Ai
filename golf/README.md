@@ -11,15 +11,15 @@ This is the first vertical slice: **swing input and ball physics on a driving ra
 - a practice putting green beside the tee
 
 - **Stack:** Three.js + TypeScript + Vite. No game engine and no loaded assets. All sound is synthesised with WebAudio and all textures are drawn to canvases, so the prototype stays small and quick to iterate on.
-- **Look:** a bright tropical island in the style of mobile golf games, shaded a bit more realistically:
-  - a cyan sky with fair-weather clouds, which also lights the scene
-  - the sea on the horizon
-  - a sun that casts soft shadows
-  - sculpted terrain: raised greens, sunken bunkers with lips, rolling dunes
-  - dense instanced grass that bends in the wind
-  - curved palms and leafy trees
-  - boulders and wildflowers
-  - a turquoise pond
+- **Look:** a realistic championship-course presentation in the style of a PGA Tour broadcast:
+  - a clear blue sky with shaded cumulus clouds and horizon haze, which also lights the scene
+  - wooded hills and a far ridge
+  - sharp 4K shadows from the sun
+  - sculpted terrain: raised greens, sunken bunkers with white sand and lips, mounds
+  - high-resolution turf with mowing stripes
+  - dense grass blades
+  - oaks and pines with anti-aliased foliage on GPUs that support it
+  - a pond
   - a clearcoat, dimpled ball
 - **The club at the ball:** a 3D club (driver, woods, hybrid, chrome irons, wedges, or putter) sits behind the ball and follows your hands through the swing.
 - **Graphics setting:** Settings → Graphics switches between **High** and **Performance**. Performance turns off real-time shadows and the grass blades, and is the default on small touch screens.
@@ -108,15 +108,13 @@ These are pure strikes in calm air. The club selector shows each club's loft and
 
 **Picking a club:** use the carousel at the bottom of the screen, the chip strip above it, the mouse wheel, or the keys.
 
-**HUD:** built to read like a mobile golf game.
-- **Left cards:** your lie, the distance to your target flag with elevation, and the wind.
-- **Right cards:** shot count, last carry, and closest-to-pin (on the putting green: putts holed).
-- **Map button:** an overhead view of the range.
-- **Eye button:** a view of your target.
-- **Club selector:** a big club button with arrows at the bottom; tap it for the whole bag.
-- **Changing lie:** tap the lie card.
+**HUD:** broadcast-style, and everything sits along the bottom.
+- **Scorebug (bottom-left):** where you are, stroke number, distance to your target pin with elevation, wind speed and direction, your lie (tap it to change), and your last carry and best proximity.
+- **Club bar (bottom-right):** the whole bag, always visible. You can change clubs at any time; if the ball is still in the air, the club you pick is ready for your next shot.
+- **Tools (above the club bar):** aim, target view, overview map, and settings.
+- **Shot tracker (bottom-centre):** appears after each shot.
 
-**Putting:** choosing the **Putter** moves you to the practice green. A glowing grid is draped over the green between you and the cup. You get a random putt 3–14 m from the cup, and the aim starts pointed at the hole.
+**Putting:** choosing the **Putter** moves you to the practice green. A subtle grid is draped over the green between you and the cup. You get a random putt 3–14 m from the cup, and the aim starts pointed at the hole.
 - The same swing gesture works, but only speed control and start line matter.
 - Toe or heel contact comes up short.
 - Hole it and you get a new putt.

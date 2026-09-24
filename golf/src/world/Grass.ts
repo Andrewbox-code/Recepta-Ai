@@ -58,8 +58,8 @@ export class Grass {
       d.scale.set(w * (0.7 + Math.random() * 0.6), h, w)
       d.updateMatrix()
       mats.push(d.matrix.clone())
-      if (tall) c.setHSL(0.22 + Math.random() * 0.05, 0.55 + Math.random() * 0.15, 0.34 + Math.random() * 0.1)
-      else c.setHSL(0.24 + Math.random() * 0.03, 0.55 + Math.random() * 0.12, 0.42 + Math.random() * 0.08)
+      if (tall) c.setHSL(0.22 + Math.random() * 0.06, 0.45 + Math.random() * 0.2, 0.24 + Math.random() * 0.1)
+      else c.setHSL(0.26 + Math.random() * 0.03, 0.5 + Math.random() * 0.12, 0.32 + Math.random() * 0.08)
       colors.push(c.clone())
     }
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide, envMapIntensity: 0.6 })

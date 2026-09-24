@@ -6,18 +6,18 @@ const AX0 = -240
 const AX1 = 240
 const AZ0 = -540
 const AZ1 = 120
-const PX_PER_M = 3.2
+const PX_PER_M = 4.2
 
 function detailTexture() {
   // Tileable grass-blade noise, mean ~0.5, used to modulate the painted colour
   // at close range so the ground never looks like a flat texture.
-  const n = 256
+  const n = 512
   const c = document.createElement('canvas')
   c.width = c.height = n
   const g = c.getContext('2d')!
   g.fillStyle = 'rgb(128,128,128)'
   g.fillRect(0, 0, n, n)
-  for (let i = 0; i < 9000; i++) {
+  for (let i = 0; i < 36000; i++) {
     const x = Math.random() * n
     const y = Math.random() * n
     const v = 70 + Math.random() * 120
@@ -36,7 +36,7 @@ function detailTexture() {
   }
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 8
+  t.anisotropy = 16
   return t
 }
 
@@ -53,14 +53,14 @@ function paintSplat() {
   // Canvas row 0 is AZ0 (far end); flipY is off so it lines up with the mesh.
 
   // Rough: mottled, darker, bluer.
-  g.fillStyle = '#5a9427'
+  g.fillStyle = '#3d6a22'
   g.fillRect(0, 0, W, H)
   for (let i = 0; i < 1800; i++) {
     const x = Math.random() * W
     const y = Math.random() * H
     const r = M(2 + Math.random() * 9)
     const gr = g.createRadialGradient(x, y, 0, x, y, r)
-    const col = Math.random() < 0.5 ? '112,166,52' : '74,128,32'
+    const col = Math.random() < 0.5 ? '78,122,40' : '46,82,24'
     gr.addColorStop(0, `rgba(${col},0.35)`)
     gr.addColorStop(1, `rgba(${col},0)`)
     g.fillStyle = gr
@@ -74,14 +74,14 @@ function paintSplat() {
     for (let z = -RANGE_LEN; z <= 12; z += 2) g.lineTo(X(FAIRWAY_HALF + fairwayWobble(z) + grow), Z(z))
     g.closePath()
   }
-  g.fillStyle = '#6aa62f'
+  g.fillStyle = '#4c8129'
   fairwayPath(2.2)
   g.fill()
   g.save()
   fairwayPath(0)
   g.clip()
   for (let z = 12; z > -RANGE_LEN - 12; z -= 12) {
-    g.fillStyle = Math.floor(-z / 12) % 2 ? '#7cb836' : '#8cc63f'
+    g.fillStyle = Math.floor(-z / 12) % 2 ? '#5b9633' : '#6aa53b'
     g.fillRect(0, Z(z - 12), W, M(12))
   }
   // Diagonal cross-cut, very subtle.
@@ -98,7 +98,7 @@ function paintSplat() {
   g.restore()
 
   // Tee box, worn with divots in the hitting area.
-  g.fillStyle = '#92cb45'
+  g.fillStyle = '#6cab3d'
   g.fillRect(X(TEE_BOX.x0), Z(TEE_BOX.z0), M(TEE_BOX.x1 - TEE_BOX.x0), M(TEE_BOX.z1 - TEE_BOX.z0))
   for (let i = 0; i < 160; i++) {
     const x = TEE_BOX.x0 + 0.5 + Math.random() * (TEE_BOX.x1 - TEE_BOX.x0 - 1)
@@ -109,13 +109,13 @@ function paintSplat() {
   }
 
   const greenAt = (x: number, z: number, r: number) => {
-    g.fillStyle = '#7ab83a'
+    g.fillStyle = '#5d9a34'
     g.beginPath()
     g.arc(X(x), Z(z), M(r + 1.5), 0, Math.PI * 2)
     g.fill()
     const gr = g.createRadialGradient(X(x), Z(z), 0, X(x), Z(z), M(r))
-    gr.addColorStop(0, '#a6d856')
-    gr.addColorStop(1, '#98cf4a')
+    gr.addColorStop(0, '#7dbb4a')
+    gr.addColorStop(1, '#72b042')
     g.fillStyle = gr
     g.beginPath()
     g.arc(X(x), Z(z), M(r), 0, Math.PI * 2)
@@ -138,14 +138,14 @@ function paintSplat() {
       g.save()
       g.translate(cx, cy)
       g.scale(k.rx / k.rz, 1)
-      g.fillStyle = '#6f8f2c'
+      g.fillStyle = '#4a7a2a'
       g.beginPath()
       g.arc(0, 0, M(k.rz + 0.35), 0, Math.PI * 2)
       g.fill()
       const sg = g.createRadialGradient(0, -M(k.rz * 0.3), 0, 0, 0, M(k.rz))
-      sg.addColorStop(0, '#fbe9a6')
-      sg.addColorStop(0.75, '#f3da88')
-      sg.addColorStop(1, '#d9bb62')
+      sg.addColorStop(0, '#f6f0de')
+      sg.addColorStop(0.75, '#ece2c6')
+      sg.addColorStop(1, '#cfc09a')
       g.fillStyle = sg
       g.beginPath()
       g.arc(0, 0, M(k.rz), 0, Math.PI * 2)
@@ -175,9 +175,9 @@ function paintSplat() {
   g.translate(X(POND.x), Z(POND.z))
   g.scale(POND.rx / POND.rz, 1)
   const pg = g.createRadialGradient(0, 0, M(POND.rz * 0.9), 0, 0, M(POND.rz * 1.35))
-  pg.addColorStop(0, '#e8d493')
-  pg.addColorStop(0.45, '#c9c078')
-  pg.addColorStop(1, 'rgba(90,148,39,0)')
+  pg.addColorStop(0, '#5a5236')
+  pg.addColorStop(0.45, '#4d6a2c')
+  pg.addColorStop(1, 'rgba(61,106,34,0)')
   g.fillStyle = pg
   g.beginPath()
   g.arc(0, 0, M(POND.rz * 1.35), 0, Math.PI * 2)
@@ -186,7 +186,7 @@ function paintSplat() {
 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 8
+  tex.anisotropy = 16
   tex.flipY = false
   tex.generateMipmaps = true
   tex.minFilter = THREE.LinearMipmapLinearFilter
@@ -209,8 +209,8 @@ function withDetail(mat: THREE.MeshStandardMaterial, detail: THREE.Texture) {
         float mid = texture2D(uDetail, vWPos.xz * 0.11).g;
         float macro = texture2D(uDetail, vWPos.xz * 0.012).b;
         float fineK = 1.0 - smoothstep(8.0, 60.0, dist);
-        diffuseColor.rgb *= mix(1.0, 0.55 + fine * 0.9, 0.7 * fineK);
-        diffuseColor.rgb *= 0.86 + mid * 0.28;
+        diffuseColor.rgb *= mix(1.0, 0.5 + fine * 1.0, 0.8 * fineK);
+        diffuseColor.rgb *= 0.82 + mid * 0.36;
         diffuseColor.rgb *= 0.86 + macro * 0.28;`,
       )
   }
@@ -257,7 +257,7 @@ export class Terrain {
       op.setY(i, heightAt(x, z) - (inside ? 0.6 : 0.05))
     }
     og.computeVertexNormals()
-    const omat = new THREE.MeshStandardMaterial({ color: 0x5a9427, roughness: 0.95 })
+    const omat = new THREE.MeshStandardMaterial({ color: 0x3d6a22, roughness: 0.95 })
     withDetail(omat, detail)
     const outer = new THREE.Mesh(og, omat)
     outer.receiveShadow = true
@@ -272,9 +272,9 @@ export class Terrain {
         {
           uTime: { value: 0 },
           uSun: { value: sunDir.clone() },
-          uDeep: { value: new THREE.Color(0x0f7f95) },
-          uHorizon: { value: new THREE.Color(0xc6f3ff) },
-          uZenith: { value: new THREE.Color(0x1fa9f2) },
+          uDeep: { value: new THREE.Color(0x1c3a3a) },
+          uHorizon: { value: new THREE.Color(0xc9dcec) },
+          uZenith: { value: new THREE.Color(0x2d6fc0) },
         },
       ]),
       vertexShader: `

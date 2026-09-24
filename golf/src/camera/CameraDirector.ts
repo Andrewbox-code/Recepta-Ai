@@ -34,21 +34,16 @@ export class CameraDirector {
     this.modeT = 0
     this.hold = false
     const f = this.fwd(aim)
-    if (putting) {
-      // Crouched behind the ball reading the line.
-      this.goalPos.copy(ball).addScaledVector(f, -1.6).add(new THREE.Vector3(0, 0.95, 0))
-      this.goalLook.copy(ball).addScaledVector(f, 9).add(new THREE.Vector3(0, -1.4, 0))
-      this.fov = 45
-      if (snap) {
-        this.pos.copy(this.goalPos)
-        this.look.copy(this.goalLook)
-      }
-      return
-    }
-    // Behind the ball, looking down the range: ball low in frame, targets visible.
-    this.goalPos.copy(ball).addScaledVector(f, -1.55).add(new THREE.Vector3(0.1, 0.66, 0))
-    this.goalLook.copy(ball).addScaledVector(f, 30).add(new THREE.Vector3(0, -3.7, 0))
-    this.fov = 50
+    // Broadcast "behind the player" framing, solved so the ball sits just above
+    // the bottom HUD whatever the screen shape.
+    const back = putting ? 1.9 : 4.2
+    const up = putting ? 0.85 : 1.35
+    this.goalPos.copy(ball).addScaledVector(f, -back).add(new THREE.Vector3(0, up, 0))
+    const ballDep = Math.atan2(up, back)
+    const portrait = this.fovScale > 1
+    const dep = ballDep - (putting ? (portrait ? 0.02 : 0.08) : portrait ? 0.03 : 0.1)
+    this.goalLook.copy(this.goalPos).addScaledVector(f, 40).add(new THREE.Vector3(0, -40 * Math.tan(dep), 0))
+    this.fov = putting ? 42 : 40
     if (snap) {
       this.pos.copy(this.goalPos)
       this.look.copy(this.goalLook)

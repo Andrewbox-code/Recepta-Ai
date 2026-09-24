@@ -130,7 +130,8 @@ export class Club3D {
     this.group.rotation.set(0, -aim, 0)
     // Offset in the club's local frame: heel toward -X, face just behind the ball (+Z).
     this.group.translateX(-face)
-    this.group.translateZ(0.028)
+    // A hand-width behind the ball, as players set up (and so the ball stays in view).
+    this.group.translateZ(this.club?.putter ? 0.03 : 0.06)
     this.angle = this.target = 0
     this.visibleTarget = true
   }

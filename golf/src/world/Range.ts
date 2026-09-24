@@ -22,8 +22,17 @@ function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => 
   draw(c.getContext('2d')!)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
-  t.anisotropy = 4
+  t.anisotropy = 16
   return t
+}
+
+// Alpha-to-coverage gives foliage clean anti-aliased edges, but only on real
+// multisampling hardware (software renderers draw nothing).
+function smoothEdges(renderer: THREE.WebGLRenderer) {
+  const gl = renderer.getContext()
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info')
+  const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : ''
+  return (gl.getParameter(gl.SAMPLES) as number) >= 2 && !/swiftshader|llvmpipe|software/i.test(name)
 }
 
 export class Range {
@@ -42,7 +51,7 @@ export class Range {
     scene.add(this.group)
     this.atmosphere = new Atmosphere(scene, renderer, shadows)
     this.terrain = new Terrain(scene, this.atmosphere.sunDir)
-    this.trees = new Trees(scene, shadows)
+    this.trees = new Trees(scene, shadows, smoothEdges(renderer))
     new Flora(scene, shadows)
     for (const t of TARGETS) {
       const cz = -t.yd * YD
