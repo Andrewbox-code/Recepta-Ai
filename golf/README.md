@@ -1,8 +1,36 @@
-# Pure Strike: driving range prototype
+# Pure Strike: gesture golf
 
 "Pure Strike" is a working title. The name only appears in `index.html`, the HUD brand line, and `package.json`.
 
-This is the first vertical slice: **swing input and ball physics on a driving range**. There's no course or career mode yet. The aim is to get the swing feeling right first.
+It started as a driving-range prototype for the swing and ball physics. It now also has **playable courses** (some start locked), **chest balls** that unlock and level up equipment, and a main menu. The game opens on the menu (press `Esc` to bring it back at any time).
+
+## Courses
+
+Each course has four holes. Every hole is built from data in `src/world/holes.ts`: a routing line, fairway, a sloped green, bunkers, water and elevation. The same layout drives both the rendering and the ball physics.
+
+| Course | Unlock | Holes |
+|---|---|---|
+| **Pinecrest Park** | open from the start | Opening Drive (P4), The Pond (P3), Long Way Home (P5), Crown Jewel (P4, false-fronted green) |
+| **Lakeside National** | 1 ★ | Shoreline (P4), The Island (P3, island green), Two Shotter (P5), Last Crossing (P4) |
+| **Canyon Ridge** | 3 ★ | The Drop (P3, 24 yds downhill), Switchback (P4, uphill), Serpent (P5), Summit (P4) |
+
+- **Stars:** finishing a round earns 1 ★. Par or better earns 2 ★, and two under or better earns 3 ★. Your best stars on each course count toward unlocking the next one.
+- **Caddie:** a club is picked for you on every shot, based on the "plays like" distance (elevation included) and your lie. You can change it at any time. You aim at the flag when it's in range, and otherwise down the fairway.
+- **Rules:** water costs a one-stroke penalty and a drop near where the ball went in. Out of bounds is stroke and distance. The ball is picked up at quadruple bogey. The lie comes from where the ball finishes: fairway, rough, bunker or green.
+- **Rolling on slopes:** greens break and false fronts send short balls back down the slope.
+- **Rewards:** each hole ends with a score card (Birdie, Par, and so on). Each round ends with a scorecard, a chest ball (Gold at two under or better, Silver at par or better, otherwise Bronze) and any courses you just unlocked.
+
+## Chest balls
+
+Every shot earns XP, and 100 XP fills a **Bronze** ball. Special shots pay out straight away:
+
+- a shot finishing inside 2 yds earns **Silver**
+- a shot finishing inside 1 yd earns **Gold**
+- a holed putt of 10 ft or more earns **Silver**
+- a holed putt of 25 ft or more earns **Gold**
+- a hole-out from off the green earns **Platinum**
+
+Open chest balls from the chest button, the menu or `C`. Each ball cracks open into 2–5 cards, and higher tiers guarantee rarer cards. Your first card of an item unlocks it in the Pro Shop, and extra cards level it up (Lv 1–5). Each level adds a little speed, forgiveness and control. Progress is saved in the browser.
 
 **What's on the range:**
 - a full 15-club bag, from driver to putter
@@ -70,7 +98,9 @@ There's no power bar and no timing meter. Everything comes from the motion itsel
 |---|---|
 | `Z` / `X`, `[` / `]`, or mouse wheel | Previous / next club |
 | `1`–`0` | Jump to the first ten clubs (DR … 9i) |
-| `N` | New putt (putter only) |
+| `N` | New putt (putter only, on the range) |
+| `Esc` | Menu (courses, range, chests, shop) |
+| `C` | Chest balls |
 | `B` | Pro Shop |
 | `Q` / `E` or arrow keys | Aim left or right |
 | `L` | Swing Lab |
@@ -240,8 +270,15 @@ src/physics/impact.ts     swing + club + lie -> launch conditions & contact type
 src/physics/flight.ts     flight / bounce / roll simulation, wind model
 src/physics/clubs.ts      club table
 src/physics/lies.ts       lies (contact) and surfaces (landing)
-src/world/layout.ts       course shape: heights + surfaces, shared by renderer and physics
-src/world/*               terrain, sky, trees, grass, range dressing, ball + lie patches, debris, tracer, wind drift
+src/world/types.ts        Layout interface shared by renderer and physics (range or a hole)
+src/world/layout.ts       the driving range's shape: heights + surfaces
+src/world/holes.ts        course holes as data -> Layout; the three courses
+src/world/Range.ts        World: sky persists, ground/trees/flags rebuilt per layout
+src/world/*               terrain, trees, grass, ball + lie patches, debris, tracer, wind drift, club models
+src/game/round.ts         scoring names, stars, caddie club pick, water drops (pure, tested)
+src/game/progress.ts      chest balls, cards, levels, course records (pure, tested)
+src/ui/ChestScreen.ts     3D chest-ball opening and reward cards
+src/ui/ProShop.ts         equipment picker with a studio render
 src/camera/*              camera director
 src/audio/*               synthesised audio
 src/ui/SwingOverlay.ts    on-screen hand path
@@ -257,8 +294,8 @@ The tuning constants for the gesture-to-club mapping are in `TUNING` in `impact.
 
 Those constants, together with the `speedRef` calibration, are the main levers for feel.
 
-## Next steps, once the swing feels right
+## Next steps
 
-1. One fully playable hole with real risk/reward: a dogleg, a water carry, a bunker-guarded green with a false front, plus putting.
-2. More holes, then a career loop with club upgrades earned from performance, a live leaderboard, and a "clutch putt to make the cut" moment.
+1. More courses, and 9- and 18-hole rounds.
+2. A career loop: tournaments with a live leaderboard and a "clutch putt to make the cut" moment.
 3. A ghost replay of your best round.
