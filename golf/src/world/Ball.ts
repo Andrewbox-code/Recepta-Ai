@@ -17,6 +17,31 @@ function radialTex(inner: string, outer: string, hold = 0) {
   return new THREE.CanvasTexture(c)
 }
 
+// Cover print: brand logo, side stamp and alignment line, so you can see it spin.
+export function ballTexture(b: { color: number; logo: string; logoColor: string }) {
+  const c = document.createElement('canvas')
+  c.width = 512
+  c.height = 256
+  const g = c.getContext('2d')!
+  g.fillStyle = `#${b.color.toString(16).padStart(6, '0')}`
+  g.fillRect(0, 0, 512, 256)
+  g.fillStyle = b.logoColor
+  g.font = 'italic 800 34px "Barlow Condensed", system-ui, sans-serif'
+  g.textAlign = 'center'
+  g.fillText(b.logo, 256, 140)
+  g.fillRect(200, 150, 112, 3)
+  g.font = '600 16px "Barlow", system-ui, sans-serif'
+  g.fillStyle = 'rgba(20,20,20,0.7)'
+  g.fillText('1', 384, 132)
+  // Alignment line on the opposite side.
+  g.fillStyle = b.logoColor
+  g.fillRect(40, 126, 90, 4)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  t.anisotropy = 8
+  return t
+}
+
 // The ball plus the little patch of world it's sitting in. The patch is what
 // makes the lie readable before you swing.
 export class Ball {
@@ -62,22 +87,7 @@ export class Ball {
       t.repeat.set(2, 1)
       return t
     })()
-    const tex = (() => {
-      const c = document.createElement('canvas')
-      c.width = 256
-      c.height = 128
-      const g = c.getContext('2d')!
-      g.fillStyle = '#f7f7f5'
-      g.fillRect(0, 0, 256, 128)
-      g.fillStyle = '#1b1b1b'
-      g.font = 'bold 18px system-ui, sans-serif'
-      g.fillText('PURE', 100, 70) // a logo so you can see it spin
-      g.fillStyle = '#d4252b'
-      g.fillRect(96, 76, 52, 3)
-      const t = new THREE.CanvasTexture(c)
-      t.colorSpace = THREE.SRGBColorSpace
-      return t
-    })()
+    const tex = ballTexture({ color: 0xf7f7f5, logo: 'PURE', logoColor: '#1b1b1b' })
     this.mesh = new THREE.Mesh(
       new THREE.SphereGeometry(BALL.radius, 48, 32),
       new THREE.MeshPhysicalMaterial({ map: tex, normalMap: normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.45, clearcoat: 1, clearcoatRoughness: 0.12, emissive: 0xffffff, emissiveIntensity: 0.06 }),
@@ -101,6 +111,13 @@ export class Ball {
   static restY(lie: Lie) {
     if (lie.id === 'tee') return TEE_HEIGHT + BALL.radius
     return BALL.radius * (1 - 1.25 * lie.ballSink)
+  }
+
+  setModel(b: { color: number; logo: string; logoColor: string }) {
+    const mat = this.mesh.material as THREE.MeshPhysicalMaterial
+    mat.map?.dispose()
+    mat.map = ballTexture(b)
+    mat.needsUpdate = true
   }
 
   setLie(lie: Lie, at: THREE.Vector3) {

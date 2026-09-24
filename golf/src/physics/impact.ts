@@ -1,6 +1,7 @@
 import type { Club } from './clubs'
 import type { Lie } from './lies'
 import type { SwingMetrics } from '../swing/analyze'
+import { NEUTRAL, type Mods } from './equipment'
 
 export type Contact = 'pure' | 'good' | 'thin' | 'top' | 'fat' | 'chunk' | 'toe' | 'heel' | 'shank' | 'whiff' | 'skied'
 
@@ -59,39 +60,39 @@ export function computeTempoChaos(m: SwingMetrics, swingPct: number, putting = f
   }
 }
 
-export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: number, rng: Rng): Launch {
+export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: number, rng: Rng, mods: Mods = NEUTRAL): Launch {
   const swingPct = m.speed / speedRef
   const effort = swingPct <= 1 ? swingPct : 1 + 0.12 * (1 - Math.exp(-(swingPct - 1) * 2.5))
   const clubSpeed = club.maxSpeed * effort
   const { transErr, chaos } = computeTempoChaos(m, swingPct, !!club.putter)
+  // Better-controlled equipment tightens the random scatter a loose swing adds.
+  const scatter = Math.max(0.4, 1 - mods.control * 0.6)
 
   // A rushed transition throws the club over the top: path goes left, face
   // stays a bit open relative to it (the classic pull-slice).
-  const path = clamp(m.pathAngle * TUNING.angleGain - 3 * transErr + gauss(rng) * (0.5 + 3.5 * chaos), -16, 16)
+  const path = clamp(m.pathAngle * TUNING.angleGain - 3 * transErr + gauss(rng) * (0.5 + 3.5 * chaos) * scatter, -16, 16)
   // The face lags the path (so swinging out-to-in leaves it open to the path:
   // fade/slice; in-to-out leaves it closed: draw/hook). Rotating the stroke
   // through impact is the release: curling left closes it, holding off opens it.
   const release = (m.faceAngle - m.pathAngle) * TUNING.angleGain
-  const face = clamp(path * TUNING.faceFollow + release - 1 * transErr + gauss(rng) * (0.4 + 4.5 * chaos), -18, 18)
+  const face = clamp(path * TUNING.faceFollow + release - 1 * transErr + gauss(rng) * (0.4 + 4.5 * chaos) * scatter, -18, 18)
 
   // Where the club bottoms out comes from *when* the hands released their
   // speed. Peak before the ball = casting = fat. Still accelerating past it =
   // holding off = thin.
-  const depthMm = clamp(
-    (m.releaseOffset - TUNING.idealRelease) * TUNING.releaseToMm + gauss(rng) * (1 + 7 * chaos) + (1 - m.decel) * 25,
-    -45,
-    70,
-  )
-  const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.8 + 4 * chaos)
+  // Forgiving heads (low CG, wide soles) blunt fat and thin contact.
+  const rawDepth = (m.releaseOffset - TUNING.idealRelease) * TUNING.releaseToMm + gauss(rng) * (1 + 7 * chaos) * scatter + (1 - m.decel) * 25
+  const depthMm = clamp(rawDepth * (1 - mods.forgiveness * 0.45), -45, 70)
+  const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.8 + 4 * chaos) * scatter
 
-  if (club.putter) return puttLaunch(m, club, swingPct, path, face, chaos, rng)
+  if (club.putter) return puttLaunch(m, club, swingPct, path, face, chaos, rng, mods)
 
-  const faceHalf = club.wood ? 48 : 32
-  const hosel = club.wood ? -40 : -26
+  const faceHalf = (club.wood ? 48 : 32) * (1 + mods.forgiveness * 0.5)
+  const hosel = (club.wood ? -40 : -26) * (1 + mods.forgiveness * 0.3)
 
   let eff = 1
-  let launchV = club.launch * (1 + (1 - Math.min(1, effort)) * 0.12) + lie.launchAdd
-  let spin = club.spin * (0.35 + 0.65 * effort) * lie.spinMul * (1 + gauss(rng) * lie.spinJitter)
+  let launchV = club.launch * (1 + (1 - Math.min(1, effort)) * 0.12) + lie.launchAdd + mods.launch
+  let spin = club.spin * mods.spin * (0.35 + 0.65 * effort) * lie.spinMul * (1 + gauss(rng) * lie.spinJitter)
   let contact: Contact = 'pure'
   let horizExtra = 0
 
@@ -104,7 +105,7 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
   // Heel/toe: loses smash, gear effect curves woods back toward the middle.
   const offC = Math.abs(toeMm) / faceHalf
   eff *= 1 - Math.min(0.5, offC * offC * 0.4)
-  let tilt = (face - path) * club.tiltGain - toeMm * club.gear * 0.4
+  let tilt = (face - path) * club.tiltGain * mods.work - toeMm * club.gear * 0.4 * (1 - mods.forgiveness * 0.5)
   horizExtra += toeMm * club.gear * 0.05
   spin *= 1 + Math.abs(face - path) * 0.012 - offC * 0.08 * club.gear
 
@@ -136,7 +137,9 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
     }
   }
 
-  let ballSpeed = clubSpeed * club.smash * eff * lie.speedMul
+  // Low-compression balls give slower swings a little extra pace.
+  const slow = mods.slowBonus * clamp((0.95 - swingPct) / 0.3, 0, 1)
+  let ballSpeed = clubSpeed * club.smash * eff * lie.speedMul * mods.speed * (1 + slow)
   let launchH = face * club.faceWeight + path * (1 - club.faceWeight) + horizExtra
 
   if (contact === 'shank') {
@@ -181,11 +184,12 @@ export function computeLaunch(m: SwingMetrics, club: Club, lie: Lie, speedRef: n
 
 // Putting: no turf interaction and no curve in the air. Speed control and
 // start line are everything; a toe/heel strike just comes up short.
-function puttLaunch(m: SwingMetrics, club: Club, swingPct: number, path: number, face: number, chaos: number, rng: Rng): Launch {
+function puttLaunch(m: SwingMetrics, club: Club, swingPct: number, path: number, face: number, chaos: number, rng: Rng, mods: Mods): Launch {
   const clubSpeed = club.maxSpeed * swingPct
-  const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.5 + 3 * chaos)
-  const off = Math.min(1, Math.abs(toeMm) / 40)
-  const eff = 1 - off * off * 0.45
+  const toeMm = m.crossX * TUNING.toeMmPerU + gauss(rng) * (0.5 + 3 * chaos) * Math.max(0.4, 1 - mods.control * 0.6)
+  // A high-MOI mallet keeps pace on off-centre strikes.
+  const off = Math.min(1, Math.abs(toeMm) / (40 * (1 + mods.forgiveness)))
+  const eff = 1 - off * off * 0.45 * (1 - mods.forgiveness * 0.6)
   const whiff = Math.abs(toeMm) > 62
   const contact: Contact = whiff ? 'whiff' : off > 0.45 ? (toeMm > 0 ? 'toe' : 'heel') : off > 0.15 ? 'good' : 'pure'
   // A putter face barely curves the start line off the path.

@@ -64,6 +64,7 @@
           <span id="aimText">Aim 0°</span>
           <button data-aim="1" aria-label="Aim right">›</button>
         </div>
+        <button class="tool" id="shopBtn" aria-label="Pro Shop" title="Pro Shop (B)"><svg viewBox="0 0 40 40"><path d="M13 8h14l2 6v20a2 2 0 0 1-2 2H13a2 2 0 0 1-2-2V14z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" /><path d="M11 14h18M15 3v9M20 2v10M25 4v8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /><circle cx="15" cy="3" r="1.8" fill="currentColor" /><circle cx="20" cy="2.4" r="1.8" fill="currentColor" /><circle cx="25" cy="4" r="1.8" fill="currentColor" /></svg></button>
         <button class="tool" id="eyeBtn" aria-label="Look at the target" title="Target view"><svg viewBox="0 0 40 40"><path d="M3 20 Q20 5 37 20 Q20 35 3 20 Z" fill="none" stroke="currentColor" stroke-width="2.6" /><circle cx="20" cy="20" r="5.5" fill="currentColor" /></svg></button>
         <button class="tool" id="mapBtn" aria-label="Overview map" title="Overview"><svg viewBox="0 0 40 40"><path d="M6 10 L15 6 L25 10 L34 6 V30 L25 34 L15 30 L6 34 Z M15 6 V30 M25 10 V34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" /></svg></button>
         <button class="tool" id="settingsBtn" aria-label="Settings" title="Settings"><svg viewBox="0 0 40 40"><path fill="currentColor" d="M17 3h6l1 5 4 2 4-3 4 4-3 4 2 4 5 1v6l-5 1-2 4 3 4-4 4-4-3-4 2-1 5h-6l-1-5-4-2-4 3-4-4 3-4-2-4-5-1v-6l5-1 2-4-3-4 4-4 4 3 4-2z" /><circle cx="20" cy="20" r="6" fill="#0f1c24" /></svg></button>
@@ -81,6 +82,7 @@
         <div><label>Spin</label><b id="dSpin">—</b></div>
       </div>
 
+      <div class="panel shop hidden" id="shop"></div>
       <div class="panel lab hidden" id="lab">
         <div class="title">Swing Lab</div>
         <div id="labBody" class="labgrid"></div>
@@ -113,7 +115,7 @@
           <button id="clearBtn">Clear markers</button>
         </div>
         <div class="field">Session <ol id="shots"></ol></div>
-        <div class="keys">Keys: Z/X or [ ] or mouse wheel change club · 1–0 jump to club · Q/E aim · N new putt · L lab · V camera · W new wind · M mute · Space skip</div>
+        <div class="keys">Keys: B pro shop · Z/X or [ ] or mouse wheel change club · 1–0 jump to club · Q/E aim · N new putt · L lab · V camera · W new wind · M mute · Space skip</div>
       </div>
 
       <div id="hint">Press &amp; hold anywhere, <b>pull down</b> to take it back, then <b>push up through the ball</b>.<br /><small>Smooth tempo beats raw speed. Swing through — don't stop at the ball.</small></div>

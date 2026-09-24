@@ -135,3 +135,25 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   .lab { bottom: auto; top: 12px; left: 8px; width: 190px; }
   #hint { top: 10px; font-size: 13px; }
 }
+
+/* ---- pro shop ---- */
+.shop { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 20px)); max-height: calc(100vh - 24px); overflow: auto; z-index: 6; display: flex; flex-direction: column; gap: 10px; }
+.shop-tabs { flex: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.shop-tabs button { font-family: 'Barlow Condensed', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.shop-preview { flex: none; position: relative; border-radius: 6px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #3a4854, #11181e 75%); border-bottom: 2px solid var(--rule); }
+#shopCanvas { position: static; width: 100%; height: 210px; display: block; }
+.shop-caption { position: absolute; left: 12px; bottom: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.shop-list { display: grid; gap: 8px; }
+.shop-card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 10px 12px; cursor: pointer; }
+.shop-card:hover { background: rgba(255, 255, 255, 0.08); }
+.shop-card.viewing { border-color: rgba(232, 198, 90, 0.6); }
+.shop-card.equipped { background: rgba(232, 198, 90, 0.1); }
+.sc-head { display: flex; justify-content: space-between; align-items: center; }
+.sc-head b { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; letter-spacing: 0.03em; }
+.sc-head em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; }
+.sc-tag { font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
+.sc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 16px; }
+.stat { display: grid; grid-template-columns: 78px 1fr; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.stat i { height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
+.stat i b { display: block; height: 100%; background: linear-gradient(90deg, #c8a74a, #f0d27a); border-radius: 3px; }
+@media (max-width: 700px) { .sc-stats { grid-template-columns: 1fr; } #shopCanvas { height: 170px; } }

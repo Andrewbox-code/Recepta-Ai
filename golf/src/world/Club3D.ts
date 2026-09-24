@@ -1,21 +1,10 @@
 import * as THREE from 'three'
 import type { Club } from '../physics/clubs'
+import type { ClubLine } from '../physics/equipment'
+import { buildClubModel } from './ClubModel'
 
 // The club at the ball. It follows your hands: pull back and it swings back,
 // push through and it comes through the ball into the follow-through.
-
-function clubLength(c: Club) {
-  if (c.putter) return 0.87
-  if (c.id === 'dr') return 1.14
-  if (c.wood) return 1.08 - (c.loft - 15) * 0.008
-  return 1.0 - (c.loft - 23) * 0.0045
-}
-
-function lieAngle(c: Club) {
-  if (c.putter) return 70
-  if (c.wood) return 58
-  return 60 + (c.loft - 23) * 0.12
-}
 
 export class Club3D {
   group = new THREE.Group() // placed at the ball, yawed to aim
@@ -28,6 +17,8 @@ export class Club3D {
   private opacity = 1
   private mats: THREE.Material[] = []
   private club: Club | null = null
+  private line: ClubLine | null = null
+  private sweetX = 0.045
 
   private shadows: boolean
 
@@ -38,94 +29,29 @@ export class Club3D {
     scene.add(this.group)
   }
 
-  setClub(c: Club) {
-    if (this.club === c) return
+  setClub(c: Club, line: ClubLine) {
+    if (this.club === c && this.line === line) return
     this.club = c
+    this.line = line
     this.model.clear()
-    this.mats = []
-    const L = clubLength(c)
-    const lie = THREE.MathUtils.degToRad(lieAngle(c))
-    const steel = new THREE.MeshStandardMaterial({ color: 0xd9dde2, metalness: 1, roughness: 0.22 })
-    const grip = new THREE.MeshStandardMaterial({ color: 0x1d2227, roughness: 0.75 })
-    const chrome = new THREE.MeshStandardMaterial({ color: 0xc9ced3, metalness: 0.9, roughness: 0.3, envMapIntensity: 0.6 })
-    const carbon = new THREE.MeshStandardMaterial({ color: 0x1a1d22, metalness: 0.35, roughness: 0.3 })
-    const accent = new THREE.MeshStandardMaterial({ color: 0x14b8e6, metalness: 0.4, roughness: 0.35 })
-    this.mats = [steel, grip, chrome, carbon, accent]
-
-    // Head in its own frame: face toward -Z (target), toe toward +X, sole at y=0.
-    // The hosel sits at the heel (origin).
-    const head = new THREE.Group()
-    if (c.putter) {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.028, 0.03), carbon)
-      blade.position.set(0.055, 0.014, 0.004)
-      const line = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.002, 0.03), new THREE.MeshBasicMaterial({ color: 0xffffff }))
-      line.position.set(0.055, 0.029, 0.004)
-      const flange = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.008, 0.035), accent)
-      flange.position.set(0.055, 0.004, 0.03)
-      head.add(blade, line, flange)
-    } else if (c.wood) {
-      const size = c.id === 'dr' ? 1 : c.id === '3h' ? 0.62 : 0.72
-      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.06, 24, 16), carbon)
-      shell.scale.set(1.0 * size, 0.55 * size, 0.95 * size)
-      shell.position.set(0.055 * size, 0.034 * size, 0.045 * size)
-      const face = new THREE.Mesh(new THREE.BoxGeometry(0.1 * size, 0.045 * size, 0.004), steel)
-      face.position.set(0.055 * size, 0.026 * size, -0.006)
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.002, 0.06 * size), accent)
-      stripe.position.set(0.055 * size, 0.066 * size, 0.04 * size)
-      head.add(shell, face, stripe)
-    } else {
-      // Iron/wedge blade: taller toe, loft tilts the face back.
-      const wedge = c.sound === 'wedge'
-      const shape = new THREE.Shape()
-      shape.moveTo(0, 0)
-      shape.lineTo(0.078, 0)
-      shape.quadraticCurveTo(0.09, 0.004, 0.088, wedge ? 0.05 : 0.044)
-      shape.quadraticCurveTo(0.07, 0.056, 0.012, 0.03)
-      shape.lineTo(0, 0.02)
-      shape.closePath()
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.022, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 2 })
-      geo.translate(0, 0, -0.011)
-      const blade = new THREE.Mesh(geo, chrome)
-      blade.rotation.x = THREE.MathUtils.degToRad(c.loft) * 0.5
-      head.add(blade)
-      const grooves = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.022), new THREE.MeshStandardMaterial({ color: 0x9aa3aa, metalness: 1, roughness: 0.45 }))
-      grooves.position.set(0.045, 0.02, -0.0135)
-      grooves.rotation.y = Math.PI
-      blade.add(grooves)
-    }
-    head.traverse((o) => ((o as THREE.Mesh).castShadow = this.shadows))
-
-    // Shaft rises from the heel toward the player (-X) at the lie angle, with
-    // the hands a touch ahead of the ball.
-    const dir = new THREE.Vector3(-Math.cos(lie), Math.sin(lie), -0.1).normalize()
-    const hands = dir.clone().multiplyScalar(L)
-    const shaftGeo = new THREE.CylinderGeometry(0.0065, 0.0045, L * 0.78, 10)
-    const shaft = new THREE.Mesh(shaftGeo, steel)
-    const gripGeo = new THREE.CylinderGeometry(0.0125, 0.0105, L * 0.24, 12)
-    const gripM = new THREE.Mesh(gripGeo, grip)
-    const up = new THREE.Vector3(0, 1, 0)
-    const q = new THREE.Quaternion().setFromUnitVectors(up, dir)
-    shaft.quaternion.copy(q)
-    shaft.position.copy(dir).multiplyScalar(L * 0.39)
-    gripM.quaternion.copy(q)
-    gripM.position.copy(dir).multiplyScalar(L * 0.88)
-    shaft.castShadow = gripM.castShadow = this.shadows
-
-    // Build relative to the hands so we can rotate about them.
-    head.position.copy(hands).negate()
-    shaft.position.sub(hands)
-    gripM.position.sub(hands)
-    this.model.add(head, shaft, gripM)
-    this.pivot.position.copy(hands)
+    const b = buildClubModel(c, line, this.shadows)
+    // Rotate about the hands: hang the model from them.
+    b.root.position.copy(b.hands).negate()
+    this.model.add(b.root)
+    this.pivot.position.copy(b.hands)
+    this.mats = b.materials
     // Swing plane contains the shaft and the target line (-Z).
-    this.axis.crossVectors(dir, new THREE.Vector3(0, 0, -1)).normalize()
+    this.axis.crossVectors(b.dir, new THREE.Vector3(0, 0, -1)).normalize()
+    // Centre of the face, so the ball sits on the sweet spot at address.
+    const box = new THREE.Box3().setFromObject(b.head)
+    this.sweetX = (box.min.x + box.max.x) / 2
     this.angle = this.target = 0
   }
 
   // Put the club behind the ball, square to the aim line.
   address(ball: THREE.Vector3, aim: number, ground: number) {
     // Heel sits a little inside the ball so the middle of the face meets it.
-    const face = this.club?.putter ? 0.055 : this.club?.wood ? 0.05 : 0.042
+    const face = this.sweetX
     this.group.position.set(ball.x, ground, ball.z)
     this.group.rotation.set(0, -aim, 0)
     // Offset in the club's local frame: heel toward -X, face just behind the ball (+Z).

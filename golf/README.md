@@ -71,6 +71,7 @@ There's no power bar and no timing meter. Everything comes from the motion itsel
 | `Z` / `X`, `[` / `]`, or mouse wheel | Previous / next club |
 | `1`–`0` | Jump to the first ten clubs (DR … 9i) |
 | `N` | New putt (putter only) |
+| `B` | Pro Shop |
 | `Q` / `E` or arrow keys | Aim left or right |
 | `L` | Swing Lab |
 | `V` | Camera style: low ball-chase or down-the-line |
@@ -118,6 +119,59 @@ These are pure strikes in calm air. The club selector shows each club's loft and
 - The same swing gesture works, but only speed control and start line matter.
 - Toe or heel contact comes up short.
 - Hole it and you get a new putt.
+
+## Equipment and the Pro Shop
+
+Open the **Pro Shop** with the golf-bag button above the club bar, or press `B`. You pick one model per slot, plus a ball, and your choice is saved. Every piece of equipment trades something for something. All brand names are made up.
+
+**Drivers**
+
+| Model | Trade-off |
+|---|---|
+| Stratos MAX | High-MOI head: mishits keep speed and start line; higher, spinnier flight |
+| Vanta LS Speed | Most ball speed and least spin (longest on a pure strike), but mishits cost more |
+| Halcyon Tour | Tightest dispersion, and shapes the ball more |
+
+**Other clubs**
+
+| Slot | Models |
+|---|---|
+| Woods & hybrids | The same three families |
+| Irons | Kestrel GI Max (wide sole, deep cavity: distance and forgiveness), Kestrel Players CB (balanced), Marlowe Forged MB (blades: spin and control, no forgiveness) |
+| Wedges | Rook SpinMill Raw (most spin), Rook WideSole (forgives heavy strikes), Rook Tour Chrome (balanced) |
+| Putters | Lyle Classic Blade (pace control), Orbit Mallet 7 (off-centre putts still get there), Lyle Tour Milled (tightest start lines) |
+
+**Balls**
+
+| Ball | Trade-off |
+|---|---|
+| Velo Distance | Low spin and long, but won't stop on greens |
+| Aria Tour | Urethane: wedge spin and feel |
+| Aria Tour X | Firmer tour ball, less driver spin |
+| Nimbus Soft | Low compression: extra pace for smoother swings; matte yellow |
+
+**What the stats do**
+
+| Stat | Effect |
+|---|---|
+| Distance | Ball speed |
+| Spin | Spin rate. Club and ball multiply, and the ball's effect depends on whether it's a long club, an iron or a wedge |
+| Forgiveness | Softens heel/toe speed loss and gear-effect curve, fat/thin contact, and shank range |
+| Control | Shrinks the random scatter a rushed or loose swing adds |
+
+**Where to find them**
+- The trade-offs are defined in `src/physics/equipment.ts` and applied in `computeLaunch`.
+- `test/equipment.test.ts` checks each trade-off, such as distance driver vs forgiving driver on pure and toe strikes, and GI irons vs blades on a heavy strike.
+- The club bar's stock yardages update for your setup.
+
+**The clubs themselves** (`src/world/ClubModel.ts`) are built in detail:
+- **Drivers and woods:** shaped with a broad, lofted face insert with scorelines; the crown is carbon weave, gloss or satin; sole weights; an adjustable hosel sleeve.
+- **Irons:** real cavity-back or muscle-back shapes with a lofted, grooved face and a badge; the game-improvement irons have a wide sole.
+- **Wedges:** milled or raw faces with a loft stamp.
+- **Putters:** a plumber's-neck blade or a fang mallet with sightlines.
+- **Every club:** a ferrule, a stepped-steel or graphite shaft with graphics, and a textured grip with an end cap.
+
+The Pro Shop shows each head on a slowly rotating turntable in a studio light setup.
 
 ## Ball physics (`src/physics`)
 

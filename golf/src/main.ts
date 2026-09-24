@@ -3,6 +3,8 @@ import { CLUBS, clubById, type Club } from './physics/clubs'
 import { Grass } from './world/Grass'
 import { Club3D } from './world/Club3D'
 import { PuttGrid } from './world/PuttGrid'
+import { ProShop } from './ui/ProShop'
+import { DEFAULT_LOADOUT, ballById, lineFor, modsFor, slotOf as slotFor, type Loadout } from './physics/equipment'
 import { PRACTICE } from './world/layout'
 import { LIES, type Lie, type LieId } from './physics/lies'
 import { computeLaunch, type Launch } from './physics/impact'
@@ -24,13 +26,14 @@ const mph = (ms: number) => ms / 0.44704
 const CLUB_COLORS: Record<string, number> = Object.fromEntries(CLUBS.map((c, i) => [c.id, new THREE.Color().setHSL((i / CLUBS.length) * 0.85, 0.75, 0.6).getHex()]))
 
 // Stock pure-strike carry (yards) in calm air, for the club selector.
-function stockDistance(c: Club) {
+function stockDistance(c: Club, loadout: Loadout) {
+  const mods = modsFor(c, loadout)
   const l: Launch = {
     clubSpeed: c.maxSpeed,
-    ballSpeed: c.maxSpeed * c.smash,
-    launchV: c.launch,
+    ballSpeed: c.maxSpeed * c.smash * mods.speed,
+    launchV: c.launch + mods.launch,
     launchH: 0,
-    spinRpm: c.spin,
+    spinRpm: c.spin * mods.spin,
     tiltDeg: 0,
     path: 0,
     face: 0,
@@ -111,6 +114,8 @@ class Game {
   stock: Record<string, number> = {}
   freshPutt = false
   pendingClub: Club | null = null
+  loadout: Loadout = { ...DEFAULT_LOADOUT, ...store.get<Partial<Loadout>>('loadout', {}) }
+  shop!: ProShop
   club3d!: Club3D
   puttGrid!: PuttGrid
   view: 'play' | 'map' | 'eye' = 'play'
@@ -140,7 +145,8 @@ class Game {
       this.grass.push(new Grass(this.scene, new THREE.Vector2(0, -4), 26, high))
       this.grass.push(new Grass(this.scene, new THREE.Vector2(PRACTICE.x, PRACTICE.z), 13, high))
     }
-    this.stock = Object.fromEntries(CLUBS.map((c) => [c.id, stockDistance(c)]))
+    this.computeStock()
+    this.ball.setModel(ballById(this.loadout.ball))
     this.club3d = new Club3D(this.scene, high)
     this.puttGrid = new PuttGrid(this.scene)
     this.debris = new Debris(this.scene)
@@ -255,7 +261,7 @@ class Game {
     this.club3d.finish()
     this.puttGrid.hide()
     this.shotCount++
-    const launch = computeLaunch(m, this.club, this.lie, this.speedRef, Math.random)
+    const launch = computeLaunch(m, this.club, this.lie, this.speedRef, Math.random, modsFor(this.club, this.loadout))
     this.overlay.hold(m, launch, ox, oy, unit)
     const start = this.ball.mesh.position.clone()
     const result = simulate(launch, start, this.aim, {
@@ -539,7 +545,7 @@ class Game {
     this.pendingClub = null
     const wasPutter = this.club.putter
     this.club = c
-    this.club3d.setClub(c)
+    this.club3d.setClub(c, lineFor(c, this.loadout))
     if (wasPutter !== !!c.putter) {
       this.shotCount = 0
       this.bestProx = Infinity
@@ -566,8 +572,23 @@ class Game {
   showClub(c: Club) {
     document.querySelectorAll<HTMLButtonElement>('#clubs button').forEach((b) => b.classList.toggle('on', b.dataset.club === c.id))
     document.querySelector('#clubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    const line = lineFor(c, this.loadout)
     $('clubName').textContent = c.name
-    $('clubMeta').textContent = c.putter ? 'Practice green' : `${c.loft}° loft · ${Math.round(this.stock[c.id] ?? 0)} yds carry`
+    $('clubMeta').textContent = c.putter ? `${line.brand} ${line.model} · practice green` : `${line.brand} ${line.model} · ${c.loft}° · ${Math.round(this.stock[c.id] ?? 0)} yds`
+  }
+
+  computeStock() {
+    this.stock = Object.fromEntries(CLUBS.map((c) => [c.id, stockDistance(c, this.loadout)]))
+  }
+
+  // Swap a club model or ball: new yardages, new head at the ball.
+  equip(slot: keyof Loadout, id: string) {
+    this.loadout = { ...this.loadout, [slot]: id }
+    store.set('loadout', this.loadout)
+    this.computeStock()
+    this.ball.setModel(ballById(this.loadout.ball))
+    this.showClub(this.pendingClub ?? this.club)
+    if (this.state === 'address') this.refreshAddress()
   }
 
   cycleClub(dir: number) {
@@ -614,7 +635,7 @@ class Game {
   refreshAddress() {
     if (this.state !== 'address') return
     const b = this.ball.mesh.position
-    this.club3d.setClub(this.club)
+    this.club3d.setClub(this.club, lineFor(this.club, this.loadout))
     this.club3d.address(b, this.aim, this.range.groundY(b.x, b.z))
     if (this.club.putter) this.puttGrid.show(b, new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z))
     else this.puttGrid.hide()
@@ -685,6 +706,8 @@ class Game {
     $('lieCard').addEventListener('click', () => {
       if (!this.club.putter) $('liePop').classList.toggle('hidden')
     })
+    this.shop = new ProShop($('shop'), (slot, id) => this.equip(slot, id))
+    $('shopBtn').addEventListener('click', () => (this.shop.isOpen ? this.shop.close() : this.shop.open(this.loadout, slotFor(this.pendingClub ?? this.club))))
     $('mapBtn').addEventListener('click', () => this.setView('map'))
     $('eyeBtn').addEventListener('click', () => this.setView('eye'))
     $('clubPrev').addEventListener('click', () => this.cycleClub(-1))
@@ -866,6 +889,10 @@ class Game {
         break
       case 'n':
         if (this.club.putter && this.state === 'address') this.newPutt()
+        break
+      case 'b':
+        if (this.shop.isOpen) this.shop.close()
+        else this.shop.open(this.loadout, slotFor(this.pendingClub ?? this.club))
         break
       case 'l':
         this.toggleLab()
