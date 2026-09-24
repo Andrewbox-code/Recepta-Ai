@@ -17,6 +17,38 @@ function radialTex(inner: string, outer: string, hold = 0) {
   return new THREE.CanvasTexture(c)
 }
 
+// Dimples as a normal map: a hex grid of shallow cups.
+export function dimpleNormal() {
+  const n = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = n
+  const g = c.getContext('2d')!
+  const img = g.createImageData(n, n)
+  const cell = 16
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const row = Math.floor(y / (cell * 0.866))
+      const ox = row % 2 ? cell / 2 : 0
+      const cx = Math.round((x - ox) / cell) * cell + ox
+      const cy = (Math.round(y / (cell * 0.866)) * cell * 0.866)
+      let dx = (x - cx) / (cell * 0.45)
+      let dy = (y - cy) / (cell * 0.45)
+      const r = Math.hypot(dx, dy)
+      if (r > 1) dx = dy = 0
+      const i = (y * n + x) * 4
+      img.data[i] = 128 - dx * 70
+      img.data[i + 1] = 128 - dy * 70
+      img.data[i + 2] = 255
+      img.data[i + 3] = 255
+    }
+  }
+  g.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(2, 1)
+  return t
+}
+
 // Cover print: brand logo, side stamp and alignment line, so you can see it spin.
 export function ballTexture(b: { color: number; logo: string; logoColor: string }) {
   const c = document.createElement('canvas')
@@ -57,36 +89,7 @@ export class Ball {
   constructor(scene: THREE.Scene, shadows: boolean) {
     this.useBlob = !shadows
     // Dimples as a normal map: a hex grid of shallow cups.
-    const normal = (() => {
-      const n = 256
-      const c = document.createElement('canvas')
-      c.width = c.height = n
-      const g = c.getContext('2d')!
-      const img = g.createImageData(n, n)
-      const cell = 16
-      for (let y = 0; y < n; y++) {
-        for (let x = 0; x < n; x++) {
-          const row = Math.floor(y / (cell * 0.866))
-          const ox = row % 2 ? cell / 2 : 0
-          const cx = Math.round((x - ox) / cell) * cell + ox
-          const cy = (Math.round(y / (cell * 0.866)) * cell * 0.866)
-          let dx = (x - cx) / (cell * 0.45)
-          let dy = (y - cy) / (cell * 0.45)
-          const r = Math.hypot(dx, dy)
-          if (r > 1) dx = dy = 0
-          const i = (y * n + x) * 4
-          img.data[i] = 128 - dx * 70
-          img.data[i + 1] = 128 - dy * 70
-          img.data[i + 2] = 255
-          img.data[i + 3] = 255
-        }
-      }
-      g.putImageData(img, 0, 0)
-      const t = new THREE.CanvasTexture(c)
-      t.wrapS = t.wrapT = THREE.RepeatWrapping
-      t.repeat.set(2, 1)
-      return t
-    })()
+    const normal = dimpleNormal()
     const tex = ballTexture({ color: 0xf7f7f5, logo: 'PURE', logoColor: '#1b1b1b' })
     this.mesh = new THREE.Mesh(
       new THREE.SphereGeometry(BALL.radius, 48, 32),
