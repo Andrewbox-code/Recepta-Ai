@@ -1,10 +1,12 @@
 import * as THREE from 'three'
 import { windAt, type Wind } from '../physics/flight'
+import type { SurfaceId } from '../physics/lies'
 import { Atmosphere } from './Atmosphere'
-import { Terrain } from './Terrain'
+import { Terrain, disposeTree } from './Terrain'
 import { Trees } from './Trees'
 import { Flora } from './Flora'
-import { FAIRWAY_HALF, PRACTICE, TARGETS, YD, heightAt, surfaceAt, groundY, type Target } from './layout'
+import { FAIRWAY_HALF, RANGE_LAYOUT, TARGETS, YD } from './layout'
+import type { Layout, Pin } from './types'
 
 export { YD, TARGETS }
 
@@ -12,7 +14,7 @@ export interface Flag {
   pos: THREE.Vector3
   cloth: THREE.Mesh
   base: Float32Array
-  target: Target | null
+  pin: Pin
 }
 
 function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
@@ -35,52 +37,90 @@ function smoothEdges(renderer: THREE.WebGLRenderer) {
   return (gl.getParameter(gl.SAMPLES) as number) >= 2 && !/swiftshader|llvmpipe|software/i.test(name)
 }
 
-export class Range {
-  group = new THREE.Group()
-  flags: Flag[] = []
+// The world around the player: sky and sun persist, while the ground, trees,
+// flags and dressing are rebuilt for whichever layout is loaded (the driving
+// range or a course hole).
+export class World {
   atmosphere: Atmosphere
-  terrain: Terrain
-  trees: Trees
+  layout: Layout = RANGE_LAYOUT
+  flags: Flag[] = []
+  private group = new THREE.Group()
+  private terrain: Terrain | null = null
+  private trees: Trees | null = null
+  private flora: Flora | null = null
   private sock!: THREE.Group
   private sockMesh!: THREE.Mesh
+  private scene: THREE.Scene
+  private shadows: boolean
+  private smooth: boolean
 
-  surfaceAt = surfaceAt
-  groundY = groundY
+  surfaceAt = (x: number, z: number): SurfaceId => this.layout.surfaceAt(x, z)
+  groundY = (x: number, z: number) => this.layout.groundY(x, z)
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, shadows: boolean) {
-    scene.add(this.group)
+    this.scene = scene
+    this.shadows = shadows
+    this.smooth = smoothEdges(renderer)
     this.atmosphere = new Atmosphere(scene, renderer, shadows)
-    this.terrain = new Terrain(scene, this.atmosphere.sunDir)
-    this.trees = new Trees(scene, shadows, smoothEdges(renderer))
-    new Flora(scene, shadows)
-    for (const t of TARGETS) {
-      const cz = -t.yd * YD
-      this.addFlag(t.color, new THREE.Vector3(t.x, heightAt(t.x, cz), cz), t, shadows)
-      const sign = this.sign(`${t.yd}`, t.color)
-      sign.position.set(t.x - t.r - 3.5, heightAt(t.x - t.r - 3.5, cz) + 1.6, cz)
-      sign.scale.set(3.6, 1.8, 1)
-      this.group.add(sign)
-    }
-    this.addFlag('#ffffff', new THREE.Vector3(PRACTICE.cup.x, 0, PRACTICE.cup.z), null, shadows)
-    for (let yd = 50; yd <= 300; yd += 50) {
-      for (const side of [-1, 1]) {
-        const x = side * (FAIRWAY_HALF + 6)
-        const z = -yd * YD
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.12), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }))
-        post.position.set(x, heightAt(x, z) + 0.45, z)
-        post.castShadow = shadows
-        this.group.add(post)
-        const s = this.sign(`${yd}`, '#ffffff')
-        s.position.set(x, heightAt(x, z) + 1.3, z)
-        s.scale.set(1.8, 0.9, 1)
-        this.group.add(s)
-      }
-    }
-    this.buildTeeArea(shadows)
-    this.buildWindsock(shadows)
+    this.load(RANGE_LAYOUT)
   }
 
-  private addFlag(color: string, pos: THREE.Vector3, target: Target | null, shadows: boolean) {
+  load(layout: Layout) {
+    this.terrain?.dispose()
+    if (this.trees) disposeTree(this.trees.group)
+    if (this.flora) disposeTree(this.flora.group)
+    disposeTree(this.group)
+    this.group = new THREE.Group()
+    this.scene.add(this.group)
+    this.flags = []
+    this.layout = layout
+    const shadows = this.shadows
+    this.terrain = new Terrain(this.scene, this.atmosphere.sunDir, layout)
+    this.trees = new Trees(this.scene, shadows, this.smooth, layout)
+    this.flora = new Flora(this.scene, shadows, layout)
+    for (const p of layout.pins) {
+      this.addFlag(p, shadows)
+      if (p.kind === 'target') {
+        const sign = this.sign(p.label ?? '', p.color)
+        sign.position.set(p.x - p.r - 3.5, layout.heightAt(p.x - p.r - 3.5, p.z) + 1.6, p.z)
+        sign.scale.set(3.6, 1.8, 1)
+        this.group.add(sign)
+      }
+    }
+    if (layout.kind === 'range') {
+      for (let yd = 50; yd <= 300; yd += 50) {
+        for (const side of [-1, 1]) {
+          const x = side * (FAIRWAY_HALF + 6)
+          const z = -yd * YD
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.12), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }))
+          post.position.set(x, layout.heightAt(x, z) + 0.45, z)
+          post.castShadow = shadows
+          this.group.add(post)
+          const s = this.sign(`${yd}`, '#ffffff')
+          s.position.set(x, layout.heightAt(x, z) + 1.3, z)
+          s.scale.set(1.8, 0.9, 1)
+          this.group.add(s)
+        }
+      }
+      this.buildTeeArea(shadows)
+    } else {
+      this.buildTeeMarkers(shadows, layout)
+    }
+    this.buildWindsock(shadows, layout)
+  }
+
+  private buildTeeMarkers(shadows: boolean, layout: Layout) {
+    for (const x of [-3.5, 3.5]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 24, 16), new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.25, metalness: 0.2 }))
+      m.position.set(x, layout.heightAt(x, -1.5) + 0.07, -1.5)
+      m.castShadow = shadows
+      this.group.add(m)
+    }
+  }
+
+  private addFlag(pin: Pin, shadows: boolean) {
+    const color = pin.color
+    const pos = new THREE.Vector3(pin.x, this.layout.heightAt(pin.x, pin.z), pin.z)
     // Fibreglass pin with yellow/white bands.
     const pinTex = canvasTex(8, 64, (g) => {
       for (let i = 0; i < 8; i++) {
@@ -106,7 +146,7 @@ export class Range {
     cloth.position.set(pos.x, pos.y + 2.08, pos.z)
     cloth.castShadow = shadows
     this.group.add(cloth)
-    this.flags.push({ pos, cloth, base: Float32Array.from(geo.attributes.position.array as Float32Array), target })
+    this.flags.push({ pos, cloth, base: Float32Array.from(geo.attributes.position.array as Float32Array), pin })
   }
 
   // Clean broadcast-style yardage board.
@@ -169,9 +209,9 @@ export class Range {
     this.group.add(balls)
   }
 
-  private buildWindsock(shadows: boolean) {
+  private buildWindsock(shadows: boolean, layout: Layout) {
     const g = new THREE.Group()
-    g.position.set(-8, 0, -1)
+    g.position.set(-8, layout.heightAt(-8, -1), -1)
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 4.2, 10), new THREE.MeshStandardMaterial({ color: 0xcfd3d6, roughness: 0.3, metalness: 0.7 }))
     pole.position.y = 2.1
     pole.castShadow = shadows
@@ -221,7 +261,7 @@ export class Range {
     if (s > 0.15) this.sock.rotation.y = Math.atan2(-w.x, -w.z)
     this.sock.rotation.x = -(1 - fill) * 1.25 + Math.sin(t * 3.1) * 0.03 * (1 - fill * 0.5)
     this.sockMesh.rotation.z = Math.sin(t * 7) * 0.05 * fill
-    this.trees.update(t, wind)
-    this.terrain.update(t)
+    this.trees?.update(t, wind)
+    this.terrain?.update(t)
   }
 }

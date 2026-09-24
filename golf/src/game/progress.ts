@@ -36,11 +36,18 @@ export interface ShotEvent {
   water: boolean
 }
 
+export interface CourseRecord {
+  stars: number
+  best: number | null // best score relative to par
+  played: number
+}
+
 interface Saved {
   cards: Record<string, number>
   chests: Tier[]
   xp: number
   opened: number
+  courses?: Record<string, CourseRecord>
 }
 
 export class Progress {
@@ -48,6 +55,7 @@ export class Progress {
   chests: Tier[] = []
   xp = 0
   opened = 0
+  courses: Record<string, CourseRecord> = {}
   private storage: Pick<Storage, 'getItem' | 'setItem'> | null
 
   constructor(storage: Pick<Storage, 'getItem' | 'setItem'> | null) {
@@ -64,6 +72,7 @@ export class Progress {
       this.chests = saved.chests ?? []
       this.xp = saved.xp ?? 0
       this.opened = saved.opened ?? 0
+      this.courses = saved.courses ?? {}
     } else {
       for (const id of STARTER_IDS) this.cards[id] = 1
       this.chests = ['silver'] // welcome gift
@@ -72,10 +81,32 @@ export class Progress {
 
   save() {
     try {
-      this.storage?.setItem('purestrike.progress', JSON.stringify({ cards: this.cards, chests: this.chests, xp: this.xp, opened: this.opened }))
+      this.storage?.setItem('purestrike.progress', JSON.stringify({ cards: this.cards, chests: this.chests, xp: this.xp, opened: this.opened, courses: this.courses }))
     } catch {
       /* private mode */
     }
+  }
+
+  totalStars() {
+    return Object.values(this.courses).reduce((s, c) => s + c.stars, 0)
+  }
+
+  courseUnlocked(needStars: number) {
+    return this.totalStars() >= needStars
+  }
+
+  // A finished round: keep the best stars and score, and pay out a chest.
+  recordRound(courseId: string, strokes: number, par: number): { stars: number; newBest: boolean; chest: Tier; unlockedMore: boolean } {
+    const rel = strokes - par
+    const stars = rel <= -2 ? 3 : rel <= 0 ? 2 : 1
+    const before = this.totalStars()
+    const rec = this.courses[courseId] ?? { stars: 0, best: null, played: 0 }
+    const newBest = rec.best === null || rel < rec.best
+    this.courses[courseId] = { stars: Math.max(rec.stars, stars), best: newBest ? rel : rec.best, played: rec.played + 1 }
+    const chest: Tier = rel <= -2 ? 'gold' : rel <= 0 ? 'silver' : 'bronze'
+    this.chests.push(chest)
+    this.save()
+    return { stars, newBest, chest, unlockedMore: this.totalStars() > before }
   }
 
   unlocked(id: string) {

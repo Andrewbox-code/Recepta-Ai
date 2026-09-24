@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { heightAt, surfaceAt } from './layout'
+import type { Layout } from './types'
 
 // Real blades around where the player stands. They share the terrain's
 // lighting (normals point up) and bend with the wind in the vertex shader.
@@ -7,7 +7,11 @@ export class Grass {
   mesh: THREE.InstancedMesh
   private uniforms = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2() } }
 
-  constructor(scene: THREE.Scene, center: THREE.Vector2, radius: number, shadows: boolean) {
+  center: THREE.Vector2
+
+  constructor(scene: THREE.Scene, center: THREE.Vector2, radius: number, shadows: boolean, layout: Layout) {
+    this.center = center.clone()
+    const { heightAt, surfaceAt } = layout
     // Tapered blade: 3 segments + tip.
     const seg = 3
     const pos: number[] = []

@@ -1,12 +1,46 @@
 import * as THREE from 'three'
-import { FAIRWAY_HALF, POND, PRACTICE, RANGE_LEN, TARGETS, TEE_BOX, WATER_Y, YD, fairwayWobble, heightAt } from './layout'
+import { FAIRWAY_HALF, POND, PRACTICE, RANGE_LEN, TARGETS, TEE_BOX, YD, fairwayWobble } from './layout'
+import type { Layout } from './types'
 
-// Area covered by the detailed, painted terrain.
+// The driving range's painted area (matches RANGE_LAYOUT.bounds).
 const AX0 = -240
 const AX1 = 240
 const AZ0 = -540
 const AZ1 = 120
 const PX_PER_M = 4.2
+// Course holes are painted per pixel from the layout, a little coarser.
+const HOLE_PX_PER_M = 2.6
+
+// Paint a hole's ground texture straight from its layout colours.
+function paintLayout(layout: Layout) {
+  const b = layout.bounds
+  const W = Math.round((b.x1 - b.x0) * HOLE_PX_PER_M)
+  const H = Math.round((b.z1 - b.z0) * HOLE_PX_PER_M)
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const g = c.getContext('2d')!
+  const img = g.createImageData(W, H)
+  const d = img.data
+  for (let j = 0; j < H; j++) {
+    const z = b.z0 + (j + 0.5) / HOLE_PX_PER_M
+    for (let i = 0; i < W; i++) {
+      const x = b.x0 + (i + 0.5) / HOLE_PX_PER_M
+      const col = layout.paintColor!(x, z)
+      const k = (j * W + i) * 4
+      d[k] = (col >> 16) & 255
+      d[k + 1] = (col >> 8) & 255
+      d[k + 2] = col & 255
+      d[k + 3] = 255
+    }
+  }
+  g.putImageData(img, 0, 0)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 16
+  tex.flipY = false
+  return tex
+}
 
 function detailTexture() {
   // Tileable grass-blade noise, mean ~0.5, used to modulate the painted colour
@@ -216,14 +250,29 @@ function withDetail(mat: THREE.MeshStandardMaterial, detail: THREE.Texture) {
   }
 }
 
+// Free GPU memory for everything under an object (used when changing holes).
+export function disposeTree(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (m.geometry) m.geometry.dispose()
+    const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []
+    for (const mat of mats) {
+      for (const v of Object.values(mat)) if (v instanceof THREE.Texture) v.dispose()
+      mat.dispose()
+    }
+  })
+  root.removeFromParent()
+}
+
 export class Terrain {
   group = new THREE.Group()
-  water: THREE.Mesh
   private waterMat: THREE.ShaderMaterial
 
-  constructor(scene: THREE.Scene, sunDir: THREE.Vector3) {
+  constructor(scene: THREE.Scene, sunDir: THREE.Vector3, layout: Layout) {
     scene.add(this.group)
     const detail = detailTexture()
+    const { x0: AX0, x1: AX1, z0: AZ0, z1: AZ1 } = layout.bounds
+    const heightAt = layout.heightAt
 
     // Detailed inner terrain (~2 m grid).
     const w = AX1 - AX0
@@ -240,7 +289,7 @@ export class Terrain {
       uv.setXY(i, (x - AX0) / w, (z - AZ0) / d)
     }
     geo.computeVertexNormals()
-    const mat = new THREE.MeshStandardMaterial({ map: paintSplat(), roughness: 0.93, metalness: 0 })
+    const mat = new THREE.MeshStandardMaterial({ map: layout.paintColor ? paintLayout(layout) : paintSplat(), roughness: 0.93, metalness: 0 })
     withDetail(mat, detail)
     const inner = new THREE.Mesh(geo, mat)
     inner.receiveShadow = true
@@ -311,11 +360,22 @@ export class Terrain {
           #include <fog_fragment>
         }`,
     })
-    this.water = new THREE.Mesh(new THREE.CircleGeometry(1, 64), this.waterMat)
-    this.water.rotation.x = -Math.PI / 2
-    this.water.scale.set(POND.rx * 1.5, POND.rz * 1.5, 1)
-    this.water.position.set(POND.x, WATER_Y, POND.z)
-    this.group.add(this.water)
+    // One water surface per lake, big enough to meet its shoreline.
+    const circle = new THREE.CircleGeometry(1, 64)
+    for (const wb of layout.water) {
+      const holder = new THREE.Group()
+      holder.position.set(wb.x, wb.level, wb.z)
+      holder.rotation.y = -wb.rot
+      const m = new THREE.Mesh(circle, this.waterMat)
+      m.rotation.x = -Math.PI / 2
+      m.scale.set(wb.rx * 1.45, wb.rz * 1.45, 1)
+      holder.add(m)
+      this.group.add(holder)
+    }
+  }
+
+  dispose() {
+    disposeTree(this.group)
   }
 
   update(t: number) {

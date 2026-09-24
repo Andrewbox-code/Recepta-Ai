@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { POND, heightAt } from './layout'
+import type { Layout } from './types'
 
 function rng(seed: number) {
   return () => {
@@ -10,7 +10,11 @@ function rng(seed: number) {
 
 // A few boulders lining the pond bank.
 export class Flora {
-  constructor(scene: THREE.Scene, shadows: boolean) {
+  group = new THREE.Group()
+
+  constructor(scene: THREE.Scene, shadows: boolean, layout: Layout) {
+    scene.add(this.group)
+    const heightAt = layout.heightAt
     const r = rng(1234)
 
     // Rocks: noise-displaced icospheres, flattened so they sit into the ground.
@@ -32,9 +36,16 @@ export class Flora {
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8578, roughness: 0.9 })
     const spots: { x: number; z: number; s: number; v: number }[] = []
     // A few boulders fringing the pond, like the reference's lakeside rocks.
-    for (let i = 0; i < 9; i++) {
-      const a = r() * Math.PI * 2
-      spots.push({ x: POND.x + Math.cos(a) * POND.rx * 1.28, z: POND.z + Math.sin(a) * POND.rz * 1.28, s: 0.5 + r() * 1.2, v: Math.floor(r() * 3) })
+    for (const w of layout.water) {
+      for (let i = 0; i < 7; i++) {
+        const a = r() * Math.PI * 2
+        const lx = Math.cos(a) * w.rx * 1.3
+        const lz = Math.sin(a) * w.rz * 1.3
+        // Rotate into place (inverse of the layout's ellipse rotation).
+        const c = Math.cos(w.rot)
+        const sn = Math.sin(w.rot)
+        spots.push({ x: w.x + lx * c - lz * sn, z: w.z + lx * sn + lz * c, s: 0.5 + r() * 1.1, v: Math.floor(r() * 3) })
+      }
     }
     const d = new THREE.Object3D()
     variants.forEach((geo, vi) => {
@@ -49,7 +60,7 @@ export class Flora {
       })
       im.castShadow = shadows
       im.receiveShadow = shadows
-      scene.add(im)
+      this.group.add(im)
     })
 
   }

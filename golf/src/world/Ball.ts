@@ -126,7 +126,7 @@ export class Ball {
   setLie(lie: Lie, at: THREE.Vector3) {
     this.lie = lie
     this.patch.clear()
-    this.patch.position.set(at.x, 0, at.z)
+    this.patch.position.set(at.x, at.y, at.z)
     // Soft-edged decals so the lie blends into the painted terrain.
     const fade = radialTex('#ffffff', '#000000', 0.55)
     const disc = (r: number, color: number, y = 0.012, tex?: THREE.Texture) => {
@@ -141,7 +141,7 @@ export class Ball {
       return m
     }
     this.tee.visible = lie.id === 'tee'
-    this.tee.position.set(at.x, TEE_HEIGHT - 0.0275 + 0.003, at.z)
+    this.tee.position.set(at.x, at.y + TEE_HEIGHT - 0.0275 + 0.003, at.z)
     switch (lie.id) {
       case 'rough': {
         disc(1.2, 0x2f5a1d)

@@ -160,12 +160,26 @@ export function simulate(l: Launch, start: V3, aim: number, env: Env, dt = 1 / 2
         vel = v3()
         break
       }
-      const dv = (s.rollDecel + s.rollDrag * sp) * dt
-      if (sp <= dv) {
+      // Slopes: a rolling ball feels 5/7 of gravity along the ground, so putts
+      // break and a ball can trickle back off a false front.
+      const e = 0.2
+      const gx = (groundY(p.x + e, p.z) - groundY(p.x - e, p.z)) / (2 * e)
+      const gz = (groundY(p.x, p.z + e) - groundY(p.x, p.z - e)) / (2 * e)
+      const ax = -(5 / 7) * G * gx
+      const az = -(5 / 7) * G * gz
+      const slopeA = Math.hypot(ax, az)
+      if (sp < 0.05 && slopeA <= s.rollDecel) {
         vel = v3()
         break
       }
-      vel = mul(vel, (sp - dv) / sp)
+      vel.x += ax * dt
+      vel.z += az * dt
+      const sp2 = Math.hypot(vel.x, vel.z)
+      const dv = (s.rollDecel + s.rollDrag * sp2) * dt
+      if (sp2 <= dv) {
+        vel = v3()
+        if (slopeA <= s.rollDecel) break
+      } else vel = mul(vel, (sp2 - dv) / sp2)
       vel.y = 0
       p = add(p, mul(vel, dt))
       p.y = groundY(p.x, p.z) + r

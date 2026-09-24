@@ -1,4 +1,5 @@
 import type { SurfaceId } from '../physics/lies'
+import type { Layout, TreeSpot } from './types'
 
 // The range's shape, shared by the renderer and the ball physics so that what
 // you see is exactly what the ball lands on.
@@ -140,4 +141,58 @@ export function fairwayWobble(z: number) {
 export function groundY(x: number, z: number) {
   const h = heightAt(x, z)
   return h < WATER_Y && ellipse(x, z, POND.x, POND.z, POND.rx, POND.rz) < 1.4 ? WATER_Y : h
+}
+
+// Tree lines hugging the range, groves on the mounds, a wood at the far end.
+function rangeTreeSpots(rnd: () => number): TreeSpot[] {
+  const spots: TreeSpot[] = []
+  const ok = (x: number, z: number) => {
+    if (Math.abs(x) < FAIRWAY_HALF + fairwayWobble(z) + 12 && z < 30 && z > -RANGE_LEN - 10) return false
+    if (ellipse(x, z, POND.x, POND.z, POND.rx, POND.rz) < 1.5) return false
+    for (const t of TARGETS) if (Math.hypot(x - t.x, z + t.yd * YD) < t.r + 12) return false
+    if (x > -45 && x < -5 && z > -12 && z < 20) return false // practice green & tee
+    return true
+  }
+  const push = (x: number, z: number, s: number) => {
+    const far = Math.abs(x) > 75 || z < -RANGE_LEN
+    spots.push({ x, z, s, pine: z < -RANGE_LEN || Math.abs(x) > 90 ? 0.5 : 0.22, far })
+  }
+  for (let z = 35; z > -RANGE_LEN - 40; z -= 5 + rnd() * 5) {
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const edge = FAIRWAY_HALF + fairwayWobble(z) + 14 + k * 11 + rnd() * 9
+        if (fbm(z * 0.01 + side * 7, k) < 0.36 && k === 0) continue // gaps in the line
+        const x = side * edge
+        if (ok(x, z)) push(x, z + rnd() * 4, 0.8 + rnd() * 0.5)
+      }
+    }
+  }
+  for (let i = 0; i < 260; i++) {
+    const x = (rnd() * 2 - 1) * 230
+    const z = -RANGE_LEN - 20 - rnd() * 150
+    if (fbm(x * 0.02, z * 0.02) > 0.42) push(x, z, 0.9 + rnd() * 0.6)
+  }
+  for (let i = 0; i < 160; i++) {
+    const side = rnd() < 0.5 ? -1 : 1
+    const x = side * (100 + rnd() * 130)
+    const z = 40 - rnd() * (RANGE_LEN + 60)
+    if (fbm(x * 0.015, z * 0.015) > 0.5 && ok(x, z)) push(x, z, 1 + rnd() * 0.5)
+  }
+  return spots
+}
+
+export const RANGE_LAYOUT: Layout = {
+  kind: 'range',
+  bounds: { x0: -240, x1: 240, z0: -540, z1: 120 },
+  tee: { x: 0, z: 0 },
+  pins: [
+    ...TARGETS.map((t) => ({ x: t.x, z: -t.yd * YD, color: t.color, r: t.r, label: `${t.yd}`, kind: 'target' as const })),
+    { x: PRACTICE.cup.x, z: PRACTICE.cup.z, color: '#ffffff', r: PRACTICE.r, kind: 'practice' as const },
+  ],
+  water: [{ x: POND.x, z: POND.z, rx: POND.rx, rz: POND.rz, rot: 0, level: WATER_Y }],
+  heightAt,
+  surfaceAt,
+  groundY,
+  outOfBounds: () => false,
+  treeSpots: rangeTreeSpots,
 }

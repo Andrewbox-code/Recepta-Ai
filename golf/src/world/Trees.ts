@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { windAt, type Wind } from '../physics/flight'
-import { FAIRWAY_HALF, POND, RANGE_LEN, TARGETS, YD, ellipse, fairwayWobble, fbm, heightAt } from './layout'
+import type { Layout } from './types'
 
 // Seeded RNG so the course looks the same every visit.
 function mulberry(seed: number) {
@@ -130,7 +130,10 @@ export class Trees {
   private species: Species[] = []
   private d = new THREE.Object3D()
 
-  constructor(scene: THREE.Scene, shadows: boolean, smoothEdges: boolean) {
+  group = new THREE.Group()
+
+  constructor(scene: THREE.Scene, shadows: boolean, smoothEdges: boolean, layout: Layout) {
+    scene.add(this.group)
     const rnd = mulberry(42)
     const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture(false), alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 })
     const needleMat = new THREE.MeshStandardMaterial({ map: leafTexture(true), alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.9 })
@@ -162,46 +165,15 @@ export class Trees {
       kinds.push({ crown: mergeGeometries(tiers)!, wood: trunk(rnd, v.h, 0.3, 0), mat: needleMat, pine: true })
     }
 
-    // Placement: tree lines hugging the range, groves on the mounds, a dense
-    // wood closing off the far end.
-    const spots: { x: number; z: number; s: number }[] = []
-    const ok = (x: number, z: number) => {
-      if (Math.abs(x) < FAIRWAY_HALF + fairwayWobble(z) + 12 && z < 30 && z > -RANGE_LEN - 10) return false
-      if (ellipse(x, z, POND.x, POND.z, POND.rx, POND.rz) < 1.5) return false
-      for (const t of TARGETS) if (Math.hypot(x - t.x, z + t.yd * YD) < t.r + 12) return false
-      if (x > -45 && x < -5 && z > -12 && z < 20) return false // practice green & tee
-      return true
-    }
-    for (let z = 35; z > -RANGE_LEN - 40; z -= 5 + rnd() * 5) {
-      for (const side of [-1, 1]) {
-        for (let k = 0; k < 3; k++) {
-          const edge = FAIRWAY_HALF + fairwayWobble(z) + 14 + k * 11 + rnd() * 9
-          if (fbm(z * 0.01 + side * 7, k) < 0.36 && k === 0) continue // gaps in the line
-          const x = side * edge
-          if (ok(x, z)) spots.push({ x, z: z + rnd() * 4, s: 0.8 + rnd() * 0.5 })
-        }
-      }
-    }
-    for (let i = 0; i < 260; i++) {
-      const x = (rnd() * 2 - 1) * 230
-      const z = -RANGE_LEN - 20 - rnd() * 150
-      if (fbm(x * 0.02, z * 0.02) > 0.42) spots.push({ x, z, s: 0.9 + rnd() * 0.6 })
-    }
-    for (let i = 0; i < 160; i++) {
-      const side = rnd() < 0.5 ? -1 : 1
-      const x = side * (100 + rnd() * 130)
-      const z = 40 - rnd() * (RANGE_LEN + 60)
-      if (fbm(x * 0.015, z * 0.015) > 0.5 && ok(x, z)) spots.push({ x, z, s: 1 + rnd() * 0.5 })
-    }
+    const spots = layout.treeSpots(rnd)
 
     const buckets: Species['items'][] = kinds.map(() => [])
     for (const [si, sp] of spots.entries()) {
-      // Performance mode: thin out the trees well away from the range.
-      if (!shadows && si % 5 < 2 && (Math.abs(sp.x) > 75 || sp.z < -RANGE_LEN)) continue
-      // Parkland: mostly hardwoods near the range, more pines on the hills.
-      const pineBias = sp.z < -RANGE_LEN || Math.abs(sp.x) > 90 ? 0.5 : 0.22
-      const k = rnd() < pineBias ? 3 + Math.floor(rnd() * 2) : Math.floor(rnd() * 3)
-      buckets[k].push({ x: sp.x, y: heightAt(sp.x, sp.z) - 0.2, z: sp.z, s: sp.s, rot: rnd() * Math.PI * 2, phase: rnd() * 10 })
+      // Performance mode: thin out the trees well away from play.
+      if (!shadows && si % 5 < 2 && sp.far) continue
+      // Parkland: mostly hardwoods, some pines.
+      const k = rnd() < sp.pine ? 3 + Math.floor(rnd() * 2) : Math.floor(rnd() * 3)
+      buckets[k].push({ x: sp.x, y: layout.heightAt(sp.x, sp.z) - 0.2, z: sp.z, s: sp.s, rot: rnd() * Math.PI * 2, phase: rnd() * 10 })
     }
 
     const tint = new THREE.Color()
@@ -216,7 +188,7 @@ export class Trees {
         else tint.setHSL(0.2 + rnd() * 0.08, 0.3 + rnd() * 0.25, 0.6 + rnd() * 0.15)
         crown.setColorAt(j, tint)
       })
-      scene.add(crown, wood)
+      this.group.add(crown, wood)
       this.species.push({ crown, wood, items })
     })
     for (const sp of this.species) {

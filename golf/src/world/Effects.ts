@@ -15,6 +15,7 @@ interface Particle {
 
 // Turf, sand and dust thrown up at impact.
 export class Debris {
+  ground: (x: number, z: number) => number = () => 0
   private mesh: THREE.InstancedMesh
   private parts: Particle[] = []
   private cap = 700
@@ -57,8 +58,9 @@ export class Debris {
       q.v.y -= 9.81 * dt
       q.v.multiplyScalar(Math.exp(-q.drag * dt))
       q.p.addScaledVector(q.v, dt)
-      if (q.p.y < 0.005) {
-        q.p.y = 0.005
+      const gy = this.ground(q.p.x, q.p.z) + 0.005
+      if (q.p.y < gy) {
+        q.p.y = gy
         q.v.set(0, 0, 0)
         q.spin.set(0, 0, 0)
       }
@@ -171,7 +173,7 @@ export class GroundMarks {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.06, length), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.9 }))
     m.rotation.x = -Math.PI / 2
     m.rotation.z = Math.atan2(dir.x, -dir.z)
-    m.position.set(at.x, 0.013, at.z)
+    m.position.set(at.x, at.y + 0.003, at.z)
     this.group.add(m)
     this.divots.push(m)
     if (this.divots.length > 40) this.group.remove(this.divots.shift()!)
@@ -180,7 +182,7 @@ export class GroundMarks {
   marker(at: THREE.Vector3, color: number) {
     const m = new THREE.Mesh(new THREE.CircleGeometry(0.6, 16), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthWrite: false }))
     m.rotation.x = -Math.PI / 2
-    m.position.set(at.x, 0.02, at.z)
+    m.position.set(at.x, at.y - 0.012, at.z)
     this.group.add(m)
     this.markers.push(m)
     if (this.markers.length > 25) this.group.remove(this.markers.shift()!)
@@ -251,8 +253,9 @@ export class WindDrift {
       if (rz < -bz) rz += bz * 2
       a[k] = this.center.x + rx
       a[k + 2] = this.center.z + rz
-      if (a[k + 1] < 0.05) a[k + 1] = this.box.y
-      if (a[k + 1] > this.box.y) a[k + 1] = 0.1
+      // Keep them in a slab above the ground around the focus.
+      if (a[k + 1] < this.center.y + 0.05) a[k + 1] = this.center.y + this.box.y
+      if (a[k + 1] > this.center.y + this.box.y) a[k + 1] = this.center.y + 0.1
     }
     pos.needsUpdate = true
   }

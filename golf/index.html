@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0f1a12" />
-    <title>Pure Strike — Range</title>
+    <title>Pure Strike</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -38,8 +38,8 @@
         </div>
         <div class="bug-foot">
           <button id="lieCard" aria-label="Change lie"><span id="lieIco" class="lie-dot"></span><span id="lieName">Fairway</span><span class="caret">▾</span></button>
-          <span class="stat">Last <b id="scoreBig">—</b></span>
-          <span class="stat">Best <b id="bestText">—</b></span>
+          <span class="stat"><i id="stat1">Last</i> <b id="scoreBig">—</b></span>
+          <span class="stat"><i id="stat2">Best</i> <b id="bestText">—</b></span>
         </div>
         <div class="pop hidden" id="liePop"><div class="row" id="lies"></div></div>
       </div>
@@ -64,6 +64,8 @@
           <span id="aimText">Aim 0°</span>
           <button data-aim="1" aria-label="Aim right">›</button>
         </div>
+        <button class="tool" id="menuBtn" aria-label="Menu" title="Menu (Esc)"><svg viewBox="0 0 40 40"><path d="M8 11h24M8 20h24M8 29h24" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg></button>
+        <button class="tool" id="chestBtn" aria-label="Chest balls" title="Chest balls (C)"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="2.6" /><path d="M7 20h26" stroke="currentColor" stroke-width="2.6" /><circle cx="20" cy="20" r="3.5" fill="currentColor" /></svg><span class="badge hidden" id="chestBadge">0</span></button>
         <button class="tool" id="shopBtn" aria-label="Pro Shop" title="Pro Shop (B)"><svg viewBox="0 0 40 40"><path d="M13 8h14l2 6v20a2 2 0 0 1-2 2H13a2 2 0 0 1-2-2V14z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" /><path d="M11 14h18M15 3v9M20 2v10M25 4v8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /><circle cx="15" cy="3" r="1.8" fill="currentColor" /><circle cx="20" cy="2.4" r="1.8" fill="currentColor" /><circle cx="25" cy="4" r="1.8" fill="currentColor" /></svg></button>
         <button class="tool" id="eyeBtn" aria-label="Look at the target" title="Target view"><svg viewBox="0 0 40 40"><path d="M3 20 Q20 5 37 20 Q20 35 3 20 Z" fill="none" stroke="currentColor" stroke-width="2.6" /><circle cx="20" cy="20" r="5.5" fill="currentColor" /></svg></button>
         <button class="tool" id="mapBtn" aria-label="Overview map" title="Overview"><svg viewBox="0 0 40 40"><path d="M6 10 L15 6 L25 10 L34 6 V30 L25 34 L15 30 L6 34 Z M15 6 V30 M25 10 V34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" /></svg></button>
@@ -115,8 +117,54 @@
           <button id="clearBtn">Clear markers</button>
         </div>
         <div class="field">Session <ol id="shots"></ol></div>
-        <div class="keys">Keys: B pro shop · Z/X or [ ] or mouse wheel change club · 1–0 jump to club · Q/E aim · N new putt · L lab · V camera · W new wind · M mute · Space skip</div>
+        <div class="keys">Keys: Esc menu · C chest balls · B pro shop · Z/X or [ ] or mouse wheel change club · 1–0 jump to club · Q/E aim · N new putt · L lab · V camera · W new wind · M mute · Space skip</div>
       </div>
+
+      <div class="panel chests hidden" id="chests"></div>
+
+      <div class="overlay-screen hidden" id="menu">
+        <div class="menu-card">
+          <div class="menu-head">
+            <div><div class="brand">Pure Strike</div><div class="menu-sub">Gesture golf</div></div>
+            <div class="menu-stars" id="menuStars">★ 0</div>
+          </div>
+          <div class="menu-section">Courses</div>
+          <div class="course-list" id="courseList"></div>
+          <div class="menu-section">Practice &amp; gear</div>
+          <div class="menu-row">
+            <button id="menuRange">Driving Range</button>
+            <button id="menuChests">Chest Balls <span class="count" id="menuChestCount">0</span></button>
+            <button id="menuShop">Pro Shop</button>
+          </div>
+          <div class="menu-row end">
+            <button id="menuQuit" class="ghost">Quit round</button>
+            <button id="menuResume" class="primary">Resume</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hole-card hidden" id="holeCard">
+        <div class="hc-hole" id="hcHole"></div>
+        <div id="hcName"></div>
+        <div class="hc-sub" id="hcSub"></div>
+        <button class="primary" id="hcNext">Next hole</button>
+      </div>
+
+      <div class="overlay-screen hidden" id="scorecard">
+        <div class="menu-card">
+          <div class="menu-head"><div><div class="menu-sub">Round complete</div><div class="brand" id="scTitle"></div></div><div class="sc-stars" id="scStars"></div></div>
+          <div class="sc-wrap"><table id="scTable"></table></div>
+          <div class="sc-summary" id="scSummary"></div>
+          <div class="menu-row end">
+            <button id="scMenu" class="ghost">Menu</button>
+            <button id="scAgain">Play again</button>
+            <button id="scChest" class="primary">Open chest</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading hidden" id="loading"><div><div class="load-title" id="loadTitle"></div><div class="load-sub" id="loadSub"></div></div></div>
+      <div id="reward"></div>
 
       <div id="hint">Press &amp; hold anywhere, <b>pull down</b> to take it back, then <b>push up through the ball</b>.<br /><small>Smooth tempo beats raw speed. Swing through — don't stop at the ball.</small></div>
       <div id="toast"></div>

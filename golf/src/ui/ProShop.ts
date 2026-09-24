@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { BALLS, CLUB_LINES, SLOTS, ballById, lineById, type Loadout, type Slot, type Stats } from '../physics/equipment'
+import { BALLS, CLUB_LINES, RARITY_COLOR, RARITY_LABEL, SLOTS, ballById, lineById, type Loadout, type Rarity, type Slot, type Stats } from '../physics/equipment'
+import type { Progress } from '../game/progress'
 import { clubById, type Club } from '../physics/clubs'
 import { buildClubModel } from '../world/ClubModel'
 import { ballTexture } from '../world/Ball'
@@ -58,8 +59,11 @@ export class ProShop {
   private previewId = ''
   frozen = false // hold the turntable still (tests)
 
-  constructor(root: HTMLElement, onEquip: (tab: Tab, id: string) => void) {
+  private progress: Progress
+
+  constructor(root: HTMLElement, progress: Progress, onEquip: (tab: Tab, id: string) => void) {
     this.root = root
+    this.progress = progress
     this.onEquip = onEquip
     root.innerHTML = `
       <div class="title">Pro Shop <button class="x" id="shopClose">✕</button></div>
@@ -78,7 +82,7 @@ export class ProShop {
       const card = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')
       if (!card) return
       const id = card.dataset.id!
-      if (card.dataset.equip) {
+      if (card.dataset.equip && this.progress.unlocked(id)) {
         this.onEquip(this.tab, id)
         this.loadout = { ...this.loadout, [this.tab]: id }
       }
@@ -182,17 +186,29 @@ export class ProShop {
     const equipped = this.loadout[this.tab]
     const items =
       this.tab === 'ball'
-        ? BALLS.map((b) => ({ id: b.id, name: `${b.brand} ${b.model}`, tag: b.tagline, stats: b.stats }))
-        : CLUB_LINES.filter((l) => l.slot === this.tab).map((l) => ({ id: l.id, name: `${l.brand} ${l.model}`, tag: l.tagline, stats: l.stats }))
+        ? BALLS.map((b) => ({ id: b.id, name: `${b.brand} ${b.model}`, tag: b.tagline, stats: b.stats, rarity: b.rarity as Rarity }))
+        : CLUB_LINES.filter((l) => l.slot === this.tab).map((l) => ({ id: l.id, name: `${l.brand} ${l.model}`, tag: l.tagline, stats: l.stats, rarity: l.rarity as Rarity }))
     const list = this.root.querySelector('#shopList')!
+    const P = this.progress
     list.innerHTML = items
-      .map(
-        (it) => `<div class="shop-card ${it.id === equipped ? 'equipped' : ''} ${it.id === (previewId ?? equipped) ? 'viewing' : ''}" data-id="${it.id}">
-          <div class="sc-head"><b>${it.name}</b>${it.id === equipped ? '<em>In the bag</em>' : `<button data-id="${it.id}" data-equip="1">Equip</button>`}</div>
+      .map((it) => {
+        const owned = P.unlocked(it.id)
+        const lvl = P.level(it.id)
+        const next = P.nextLevel(it.id)
+        const rar = `<span class="rar-pill" style="--c:${RARITY_COLOR[it.rarity]}">${RARITY_LABEL[it.rarity]}</span>`
+        const level = owned ? `<span class="lvl">Lv ${lvl}${next ? ` · ${next.have}/${next.need} cards` : ' · MAX'}</span>` : ''
+        const action = !owned
+          ? '<em class="locked">🔒 Find in chest balls</em>'
+          : it.id === equipped
+            ? '<em>In the bag</em>'
+            : `<button data-id="${it.id}" data-equip="1">Equip</button>`
+        return `<div class="shop-card ${owned ? '' : 'is-locked'} ${it.id === equipped ? 'equipped' : ''} ${it.id === (previewId ?? equipped) ? 'viewing' : ''}" data-id="${it.id}">
+          <div class="sc-head"><b>${it.name}</b>${action}</div>
+          <div class="sc-meta">${rar}${level}</div>
           <div class="sc-tag">${it.tag}</div>
           <div class="sc-stats">${this.bars(it.stats)}</div>
-        </div>`,
-      )
+        </div>`
+      })
       .join('')
     this.showPreview(previewId ?? equipped)
   }

@@ -19,7 +19,8 @@ export class CameraDirector {
   private modeT = 0
   private fov = 50
   private hold = false
-  fovScale = 1 // wider on portrait screens // stay put and just watch (putting)
+  fovScale = 1 // wider on portrait screens
+  ground: (x: number, z: number) => number = () => 0 // stay put and just watch (putting)
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.05, 4000)
@@ -87,7 +88,7 @@ export class CameraDirector {
       .copy(this.landingSpot)
       .addScaledVector(flat, 16)
       .addScaledVector(r, -side * 9)
-      .setY(1.6)
+      .setY(this.landingSpot.y + 1.6)
     this.goalPos.copy(this.pos)
     this.fov = 38
   }
@@ -134,7 +135,8 @@ export class CameraDirector {
           .copy(ball)
           .addScaledVector(flat, -9)
           .addScaledVector(side, 1.8)
-        this.goalPos.y = Math.max(0.9, ball.y * 0.8 - 0.4)
+        const gb = this.ground(ball.x, ball.z)
+        this.goalPos.y = this.ground(this.goalPos.x, this.goalPos.z) + Math.max(0.9, (ball.y - gb) * 0.8 - 0.4)
         this.pos.lerp(this.goalPos, damp(2.4, dt))
         this.look.lerp(ball, damp(12, dt))
         this.fov = 55
@@ -161,6 +163,9 @@ export class CameraDirector {
 
     this.camera.fov += (Math.min(80, this.fov * this.fovScale) - this.camera.fov) * damp(3, dt)
     this.camera.updateProjectionMatrix()
+    // Never dip below the ground (hilly holes, elevated tees).
+    const gy = this.ground(this.pos.x, this.pos.z) + 0.45
+    if (this.pos.y < gy) this.pos.y = gy
     this.camera.position.copy(this.pos)
     this.shakeAmt *= Math.exp(-dt * 6)
     if (this.shakeAmt > 0.001) {

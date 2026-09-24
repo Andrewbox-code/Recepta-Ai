@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { heightAt } from './layout'
+import type { Layout } from './types'
 
 // Glowing read-the-green grid, draped over the turf between ball and cup.
 export class PuttGrid {
@@ -33,7 +33,8 @@ export class PuttGrid {
     scene.add(this.mesh)
   }
 
-  show(ball: THREE.Vector3, cup: THREE.Vector3) {
+  show(ball: THREE.Vector3, cup: THREE.Vector3, layout: Layout) {
+    const heightAt = layout.heightAt
     const mid = ball.clone().add(cup).multiplyScalar(0.5)
     const r = Math.max(4, ball.distanceTo(cup) * 0.5 + 3)
     const size = r * 2
