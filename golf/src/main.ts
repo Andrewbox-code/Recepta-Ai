@@ -271,13 +271,17 @@ class Game {
       // and line up on the flag (or down the fairway if it's out of reach).
       const r = this.round
       const d = Math.hypot(r.layout.cup.x - this.tee.x, r.layout.cup.z - this.tee.z)
+      // Uphill plays longer, downhill shorter, about a yard per yard.
+      const playsLike = d + this.world.groundY(r.layout.cup.x, r.layout.cup.z) - this.world.groundY(this.tee.x, this.tee.z)
       const fringePutt = this.world.surfaceAt(this.tee.x, this.tee.z) === 'fringe' && d < 12
-      this.club = this.pendingClub ?? (fringePutt ? clubById('pt') : suggestClub(CLUBS, this.stock, d, this.lie.id, r.teeShot, r.layout.par))
+      this.club = this.pendingClub ?? (fringePutt ? clubById('pt') : suggestClub(CLUBS, this.stock, playsLike, this.lie.id, r.teeShot, r.layout.par))
       this.pendingClub = null
       this.showClub(this.club)
       this.aimRound()
     }
     const gy = this.world.groundY(this.tee.x, this.tee.z)
+    const cup = this.round?.layout.cup
+    this.cam.lift = cup ? Math.min(2.2, Math.max(0, (gy - this.world.groundY(cup.x, cup.z)) * 0.08)) : 0
     const p = new THREE.Vector3(this.tee.x, gy + Ball.restY(this.lie), this.tee.z)
     this.ball.place(p)
     this.ball.setLie(this.lie, new THREE.Vector3(this.tee.x, gy, this.tee.z))
@@ -410,7 +414,10 @@ class Game {
         this.debris.spray(new THREE.Vector3(at.x, gy + 0.03, at.z), f, { count: 3, colors: [0xffffff], speed: 6 * pow, spread: 2, up: 3, size: 0.02 })
         this.ball.tee.visible = false
         break
+      case 'green':
+        break
       default:
+        if (this.club.putter) break
         if (iron || fat > 0) {
           const n = fat > 0 ? 40 + fat * 4 : l.depthMm < -6 ? 4 : 22
           this.debris.spray(ground, f, { count: n, colors: fat > 0 ? [...grass, ...dirt] : grass, speed: (fat > 0 ? 3.5 : 6) * pow, spread: 1.8, up: fat > 0 ? 3.5 : 2, size: fat > 0 ? 0.022 : 0.014 })
@@ -683,13 +690,13 @@ class Game {
     }
   }
 
-  startRound(id: string) {
+  startRound(id: string, hole = 0) {
     const course = courseById(id)
     if (!this.progress.courseUnlocked(course.unlockStars)) return
     this.closeMenu()
     this.mode = 'round'
     this.round = null
-    this.loadHole(course, 0, [])
+    this.loadHole(course, hole, [])
   }
 
   private loadHole(course: CourseSpec, i: number, scores: number[]) {
@@ -699,6 +706,7 @@ class Game {
     $('loadSub').textContent = `${course.name} · Par ${spec.par}`
     shade.classList.remove('hidden', 'out')
     $('holeCard').classList.add('hidden')
+    $('data').classList.add('hidden')
     this.input.enabled = false
     // Let the card paint before the (blocking) build.
     setTimeout(() => {
@@ -820,7 +828,7 @@ class Game {
     this.input.enabled = false
     this.renderMenu()
     $('menu').classList.remove('hidden')
-    $('menuResume').classList.toggle('hidden', !this.swung && this.mode === 'range')
+    $('menuResume').classList.toggle('hidden', this.state === 'done' || (!this.swung && this.mode === 'range'))
     $('menuQuit').classList.toggle('hidden', !this.round)
   }
 
@@ -844,7 +852,7 @@ class Game {
         <div class="c-blurb">${open ? c.blurb : `🔒 Earn ${c.unlockStars} ★ to unlock (you have ${stars})`}</div>
       </button>`
     }).join('')
-    $('menuChestCount').textContent = `${this.progress.chests.length}`
+    this.updateChestBadge()
   }
 
   updateChestBadge() {
@@ -852,6 +860,7 @@ class Game {
     $('chestBadge').textContent = `${n}`
     $('chestBadge').classList.toggle('hidden', n === 0)
     $('menuChestCount').textContent = `${n}`
+    $('menuChestCount').classList.toggle('hidden', n === 0)
   }
 
   openChests() {
@@ -1064,7 +1073,8 @@ class Game {
     const elev = `${dy >= 0 ? '+' : '−'}${Math.abs(dy).toFixed(1)}`
     $('pinDist').textContent = this.club.putter ? `${(d / 0.3048).toFixed(1)}` : `${yd(d).toFixed(0)}`
     $('pinUnit').textContent = this.club.putter ? 'ft' : 'yds'
-    $('pinElev').textContent = `Elevation ${elev} yds`
+    const plays = Math.abs(dy) >= 3 && !this.club.putter ? ` · plays ${Math.round(yd(d) + dy)}` : ''
+    $('pinElev').textContent = `Elevation ${elev} yds${plays}`
   }
 
   // Overview map / look-at-the-target views, only while addressing the ball.
@@ -1076,9 +1086,14 @@ class Game {
     const b = this.ball.mesh.position
     const f = new THREE.Vector3(Math.sin(this.aim), 0, -Math.cos(this.aim))
     if (this.view === 'map') {
-      const dist = this.club.putter ? 10 : Math.min(260, Math.max(80, this.stock[this.club.id] * YD))
+      let dist = this.club.putter ? 10 : Math.min(260, Math.max(80, this.stock[this.club.id] * YD))
+      const cup = this.cupPos()
+      if (cup && !this.club.putter) dist = Math.max(40, Math.min(dist, Math.hypot(cup.x - b.x, cup.z - b.z) + 15))
       const mid = b.clone().addScaledVector(f, dist * 0.55)
-      this.cam.view(mid.clone().addScaledVector(f, -dist * 0.35).setY(dist * 1.1), mid)
+      mid.y = this.world.groundY(mid.x, mid.z)
+      const eye = mid.clone().addScaledVector(f, -dist * 0.35)
+      eye.y = Math.max(mid.y, this.world.groundY(b.x, b.z)) + dist * 1.1
+      this.cam.view(eye, mid)
     } else if (this.view === 'eye') {
       const pin = this.lastPin
       const back = new THREE.Vector3(pin.x - b.x, 0, pin.z - b.z).normalize()
@@ -1122,7 +1137,7 @@ class Game {
     })
     $('hcNext').addEventListener('click', () => this.nextHole())
     $('scChest').addEventListener('click', () => {
-      $('scorecard').classList.add('hidden')
+      this.startRange()
       this.openMenu()
       this.openChests()
     })

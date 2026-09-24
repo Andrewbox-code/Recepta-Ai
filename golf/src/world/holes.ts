@@ -127,7 +127,10 @@ export function buildHole(spec: HoleSpec): HoleLayout {
   // Terrain without the water hollows (used to set each lake's level).
   const baseHeight = (x: number, z: number) => {
     const q = near(x, z)
-    let h = lerp(teeElev, greenElev, sst(0.1 * total, 0.92 * total, q.t))
+    // Downhill holes fall away right off the tee (so you can see the green
+    // from the tee); level and uphill holes ease in and out.
+    const u = Math.min(1, Math.max(0, (q.t - 0.04 * total) / (0.86 * total)))
+    let h = lerp(teeElev, greenElev, teeElev > greenElev ? 1 - (1 - u) * (1 - u) : sst(0.1 * total, 0.92 * total, q.t))
     const n = fbm(x * 0.02 + seed, z * 0.02 - seed)
     h += (n - 0.5) * (0.8 + 5 * hills * sst(fwHalf + 4, fwHalf + 55, q.d))
     h += sst(fwHalf + 60, fwHalf + 220, q.d) * 22 * hills * fbm(x * 0.006 + seed, z * 0.006)

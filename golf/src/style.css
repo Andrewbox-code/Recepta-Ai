@@ -43,7 +43,7 @@ button { font: inherit; cursor: pointer; border: 0; color: inherit; background: 
 .wring { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; }
 #windArrow path { stroke: var(--accent); stroke-width: 3.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .bug-foot { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 13px; color: var(--muted); }
-.bug-foot .stat b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 3px; }
+.bug-foot .bstat b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 3px; }
 #lieCard { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 6px; margin-right: auto; border-radius: 4px; background: rgba(255, 255, 255, 0.08); font-weight: 600; font-size: 13px; }
 #lieCard:hover { background: rgba(255, 255, 255, 0.16); }
 .caret { color: var(--muted); font-size: 10px; }
@@ -161,7 +161,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* ---- lie card on a course: the ball decides ---- */
 #lieCard.fixed { pointer-events: none; }
 #lieCard.fixed .caret { display: none; }
-.bug-foot .stat i { font-style: normal; }
+.bug-foot .bstat i { font-style: normal; }
 .tool { position: relative; }
 .badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e5484d; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 .primary { background: var(--accent) !important; color: var(--ink) !important; }

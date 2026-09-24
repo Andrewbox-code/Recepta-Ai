@@ -20,6 +20,7 @@ export class CameraDirector {
   private fov = 50
   private hold = false
   fovScale = 1 // wider on portrait screens
+  lift = 0 // extra address height (metres) for downhill shots
   ground: (x: number, z: number) => number = () => 0 // stay put and just watch (putting)
 
   constructor(aspect: number) {
@@ -37,8 +38,9 @@ export class CameraDirector {
     const f = this.fwd(aim)
     // Broadcast "behind the player" framing, solved so the ball sits just above
     // the bottom HUD whatever the screen shape.
-    const back = putting ? 1.9 : 4.2
-    const up = putting ? 0.85 : 1.35
+    // Off an elevated tee, sit higher so the green isn't hidden by the tee box.
+    const back = putting ? 1.9 : 4.2 + this.lift * 1.2
+    const up = putting ? 0.85 : 1.35 + this.lift
     this.goalPos.copy(ball).addScaledVector(f, -back).add(new THREE.Vector3(0, up, 0))
     const ballDep = Math.atan2(up, back)
     const portrait = this.fovScale > 1
